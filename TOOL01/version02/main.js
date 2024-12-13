@@ -73,27 +73,70 @@ function createInfoPlane() {
 const infoPlane = createInfoPlane();
 scene.add(infoPlane.mesh);
 
-// Animation loop
+// Add this function to your code
+function convertToNumberInput(elementId, currentValue, minValue, maxValue, stepValue, updateCallback) {
+    // Get the element
+    const element = document.getElementById(elementId);
+    if (!element) return;
+
+    // Create new input element
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.value = currentValue;
+    input.min = minValue;
+    input.max = maxValue;
+    input.step = stepValue;
+    input.style.width = '60px'; // Set a reasonable width
+
+    // Replace the original element with the input
+    element.parentNode.replaceChild(input, element);
+
+    // Add event listener for input changes
+    input.addEventListener('input', function() {
+        const value = parseFloat(this.value);
+        if (!isNaN(value)) {
+            updateCallback(value);
+        }
+    });
+
+    // Return the input element for reference
+    return input;
+}
+
+// Example usage for position fields (add after your existing code):
+convertToNumberInput('field02', cube.position.x, -10, 10, 0.1, 
+    (value) => { cube.position.x = value; });
+convertToNumberInput('field03', cube.position.y, -10, 10, 0.1, 
+    (value) => { cube.position.y = value; });
+convertToNumberInput('field04', cube.position.z, -10, 10, 0.1, 
+    (value) => { cube.position.z = value; });
+
+// Example usage for rotation fields
+convertToNumberInput('field05', cube.rotation.x, -Math.PI, Math.PI, 0.1, 
+    (value) => { cube.rotation.x = value; });
+convertToNumberInput('field06', cube.rotation.y, -Math.PI, Math.PI, 0.1, 
+    (value) => { cube.rotation.y = value; });
+convertToNumberInput('field07', cube.rotation.z, -Math.PI, Math.PI, 0.1, 
+    (value) => { cube.rotation.z = value; });
+
+// Modify your animate function to update input values instead of text content
 function animate() {
     requestAnimationFrame(animate);
     
-    // Update the text inside the element with id field02 with value of cube.position.x
-    document.getElementById('field02').textContent = cube.position.x.toFixed(2);
-    
-    // Update the text inside the element with id field03 with value of cube.position.y
-    document.getElementById('field03').textContent = cube.position.y.toFixed(2);
-    
-    // Update the text inside the element with id field04 with value of cube.position.z
-    document.getElementById('field04').textContent = cube.position.z.toFixed(2);
+    // Update input values only if they don't have focus
+    document.querySelectorAll('input[type="number"]').forEach(input => {
+        if (document.activeElement !== input) {
+            switch(input.id) {
+                case 'field02': input.value = cube.position.x.toFixed(2); break;
+                case 'field03': input.value = cube.position.y.toFixed(2); break;
+                case 'field04': input.value = cube.position.z.toFixed(2); break;
+                case 'field05': input.value = cube.rotation.x.toFixed(2); break;
+                case 'field06': input.value = cube.rotation.y.toFixed(2); break;
+                case 'field07': input.value = cube.rotation.z.toFixed(2); break;
+            }
+        }
+    });
 
-    // Update the text inside the element with id field05 with value of cube.rotation.x
-    document.getElementById('field05').textContent = cube.rotation.x.toFixed(2);
-    
-    // Update the text inside the element with id field06 with value of cube.rotation.y
-    document.getElementById('field06').textContent = cube.rotation.y.toFixed(2);
-    
-    // Update the text inside the element with id field07 with value of cube.rotation.z
-    document.getElementById('field07').textContent = cube.rotation.z.toFixed(2);
     renderer.render(scene, camera);
 }
 animate();
