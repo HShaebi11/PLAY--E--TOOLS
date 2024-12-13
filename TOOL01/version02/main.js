@@ -375,3 +375,89 @@ if (pdfButton) {
         }
     });
 }
+
+// SVG Export functionality
+const svgButton = document.getElementById('svgbutton');
+if (svgButton) {
+    svgButton.style.cursor = 'pointer';
+    svgButton.style.userSelect = 'none';
+    svgButton.setAttribute('role', 'button');
+    svgButton.setAttribute('tabindex', '0');
+
+    svgButton.addEventListener('click', function() {
+        console.log('SVG button clicked');
+
+        try {
+            // Temporarily hide transform controls
+            const wasVisible = transformControls.visible;
+            transformControls.visible = false;
+            
+            // Force a render
+            renderer.render(scene, camera);
+            
+            // Get the canvas data
+            const glCanvas = renderer.domElement;
+            const canvasWidth = glCanvas.width;
+            const canvasHeight = glCanvas.height;
+            
+            // Create SVG
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('width', canvasWidth);
+            svg.setAttribute('height', canvasHeight);
+            svg.setAttribute('viewBox', `0 0 ${canvasWidth} ${canvasHeight}`);
+            
+            // Create image element in SVG using canvas data
+            const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+            img.setAttribute('width', canvasWidth);
+            img.setAttribute('height', canvasHeight);
+            img.setAttribute('href', glCanvas.toDataURL('image/png'));
+            svg.appendChild(img);
+            
+            // Convert SVG to string
+            const svgData = new XMLSerializer().serializeToString(svg);
+            
+            // Create download link
+            const link = document.createElement('a');
+            const blob = new Blob([svgData], { type: 'image/svg+xml' });
+            const url = window.URL.createObjectURL(blob);
+            
+            // Get current date and time for filename
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = now.getFullYear();
+
+            link.download = `PLAY(E)—T1—${hours}:${minutes}—${day}${month}${year}.svg`;
+            link.href = url;
+            link.click();
+            
+            // Cleanup
+            window.URL.revokeObjectURL(url);
+            
+            // Restore transform controls visibility
+            transformControls.visible = wasVisible;
+            renderer.render(scene, camera);
+            
+            console.log('SVG generated successfully');
+
+        } catch (error) {
+            console.error('Error generating SVG:', error);
+            console.error('Error details:', error.message);
+        }
+    });
+
+    // Add visual feedback
+    svgButton.addEventListener('mousedown', function() {
+        this.style.transform = 'scale(0.98)';
+    });
+
+    svgButton.addEventListener('mouseup', function() {
+        this.style.transform = 'scale(1)';
+    });
+
+    svgButton.addEventListener('mouseleave', function() {
+        this.style.transform = 'scale(1)';
+    });
+}
