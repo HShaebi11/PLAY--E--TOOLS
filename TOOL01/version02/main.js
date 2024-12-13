@@ -646,17 +646,23 @@ function setupExportButtons() {
         renderer.render(scene, camera);
 
         try {
+            // Get the container dimensions in pixels
+            const container = document.querySelector('#three-container');
+            const containerStyle = window.getComputedStyle(container);
+            const containerWidth = parseFloat(containerStyle.width);
+            const containerHeight = parseFloat(containerStyle.height);
+            
             // Get the canvas
             const canvas = renderer.domElement;
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             
-            // Get canvas data as PNG (since direct SVG conversion might not work well with WebGL)
+            // Get canvas data as PNG
             const imgData = canvas.toDataURL('image/png');
             
-            // Create a simple SVG wrapper around the image
+            // Create SVG wrapper with explicit pixel dimensions
             const svgContent = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}">
-                    <image width="100%" height="100%" href="${imgData}"/>
+                <svg xmlns="http://www.w3.org/2000/svg" width="${containerWidth}px" height="${containerHeight}px" viewBox="0 0 ${containerWidth} ${containerHeight}">
+                    <image x="0" y="0" width="${containerWidth}" height="${containerHeight}" href="${imgData}"/>
                 </svg>
             `;
             
