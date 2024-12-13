@@ -1,83 +1,67 @@
-// Set up scene, camera, and renderer
+// Scene setup
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+const container = document.querySelector('#three-container');
+const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer();
-
-// Get the container element and its dimensions
-const container = document.getElementById('three-container');
-const containerWidth = container.offsetWidth;
-const containerHeight = container.offsetHeight;
-
-// Set up camera with container's aspect ratio
-camera.aspect = containerWidth / containerHeight;
-camera.updateProjectionMatrix();
-
-// Set renderer size and pixel ratio
-renderer.setSize(containerWidth, containerHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(container.clientWidth, container.clientHeight);
 container.appendChild(renderer.domElement);
 
-// Cube
-const geometry = new THREE.BoxGeometry(1, 1, 1);
-const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+// Variables for cube properties
+let rotationX = 0;
+let rotationY = 0; 
+let rotationZ = 0;
+let positionX = 0;
+let positionY = 0;
+let positionZ = 0;
+let scaleX = 1;
+let scaleY = 1;
+let scaleZ = 1;
+let colour = new THREE.Color(0x00ff00); // Green color
+
+// Create cube
+const geometry = new THREE.BoxGeometry();
+const material = new THREE.MeshPhongMaterial({ color: colour });
 const cube = new THREE.Mesh(geometry, material);
+cube.position.set(positionX, positionY, positionZ);
+cube.scale.set(scaleX, scaleY, scaleZ);
 scene.add(cube);
 
-// Variables for Cube properties
-let position = {
-    x: 0,
-    y: 0,
-    z: 0
-};
+// Add lights
+const ambientLight = new THREE.AmbientLight(0x404040);
+scene.add(ambientLight);
 
-let rotation = {
-    x: 0,
-    y: 0,
-    z: 0
-};
+const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+directionalLight.position.set(1, 1, 1);
+scene.add(directionalLight);
 
-let scale = {
-    x: 1,
-    y: 1,
-    z: 1
-};
-
-let color = 0x00ff00;
-
-// Update cube properties
-function updateCube() {
-    cube.position.set(position.x, position.y, position.z);
-    cube.rotation.set(rotation.x, rotation.y, rotation.z);
-    cube.scale.set(scale.x, scale.y, scale.z);
-    cube.material.color.setHex(color);
-}
+// Add OrbitControls
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
 
 // Position camera
 camera.position.z = 5;
-camera.position.y = 2;
-camera.lookAt(0, 0, 0);
 
 // Animation loop
 function animate() {
     requestAnimationFrame(animate);
     
-    // Example: Rotate cube
-    rotation.x += 0.01;
-    rotation.y += 0.01;
+    // Update cube rotation
+    cube.rotation.x += rotationX;
+    cube.rotation.y += rotationY;
+    cube.rotation.z += rotationZ;
     
-    updateCube();
+    controls.update();
     renderer.render(scene, camera);
 }
-animate();
 
 // Handle window resize
 window.addEventListener('resize', () => {
-    const newWidth = container.offsetWidth;
-    const newHeight = container.offsetHeight;
-    
-    camera.aspect = newWidth / newHeight;
+    camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
-    
-    renderer.setSize(newWidth, newHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+// Start animation
+animate();
+
