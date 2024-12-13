@@ -465,105 +465,78 @@ if (svgButton) {
 // Add GLTFLoader
 const loader = new THREE.GLTFLoader();
 
-// Convert field00 to file input and add import functionality
-function convertToModelInput(elementId) {
-    const element = document.getElementById(elementId);
-    if (!element) {
-        console.warn(`Element with id ${elementId} not found`);
+// Add file handling to existing upload button
+function addModelUpload() {
+    const uploadButton = document.getElementById('upload');
+    if (!uploadButton) {
+        console.warn('Upload button not found');
         return;
     }
 
+    // Make button clickable
+    uploadButton.style.cursor = 'pointer';
+
+    // Create hidden file input
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.glb,.gltf';
-    input.className = 'field';
-    
-    const computedStyle = window.getComputedStyle(element);
-    Object.assign(input.style, {
-        width: computedStyle.width,
-        height: computedStyle.height,
-        padding: computedStyle.padding,
-        margin: computedStyle.margin,
-        border: computedStyle.border,
-        fontSize: computedStyle.fontSize,
-        color: computedStyle.color,
-        backgroundColor: computedStyle.backgroundColor
-    });
-    
-    input.id = element.id;
-    element.parentNode.replaceChild(input, element);
+    input.style.display = 'none';
+    uploadButton.appendChild(input);
 
-    // Import functionality
+    // Click handler for the upload button
+    uploadButton.addEventListener('click', () => {
+        input.click();
+    });
+
+    // File input change handler
     input.addEventListener('change', function(event) {
         const file = event.target.files[0];
-        if (!file) {
-            console.log('No file selected');
-            return;
+        if (file) {
+            const fileURL = URL.createObjectURL(file);
+
+            // Load the new model
+            loader.load(
+                fileURL,
+                function (gltf) {
+                    // Detach controls before modifying cube
+                    transformControls.detach();
+
+                    // Remove all children from cube
+                    while(cube.children.length > 0) {
+                        cube.remove(cube.children[0]);
+                    }
+
+                    // Add model as child of cube
+                    const model = gltf.scene;
+                    
+                    // Apply color to model
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            child.material.color = new THREE.Color(color);
+                        }
+                    });
+                    
+                    cube.add(model);
+                    
+                    // Reattach transform controls to cube
+                    transformControls.attach(cube);
+                    
+                    // Render the scene
+                    renderer.render(scene, camera);
+                    
+                    // Cleanup
+                    URL.revokeObjectURL(fileURL);
+                },
+                undefined,
+                function (error) {
+                    console.error('Error loading model:', error);
+                    alert('Failed to load model');
+                    URL.revokeObjectURL(fileURL);
+                }
+            );
         }
-
-        console.log('File selected:', file.name);
-
-        const fileURL = URL.createObjectURL(file);
-        console.log('Created URL:', fileURL);
-
-        // Load the 3D model
-        loader.load(
-            fileURL,
-            function (gltf) {
-                console.log('Model loaded successfully');
-                
-                // Remove existing cube
-                scene.remove(cube);
-                transformControls.detach();
-                console.log('Removed existing cube');
-
-                // Get the model and log its contents
-                const model = gltf.scene;
-                console.log('Model contents:', model);
-
-                // Basic position and scale
-                model.position.set(0, 0, 0);
-                model.scale.set(1, 1, 1);
-                
-                // Add to scene
-                scene.add(model);
-                console.log('Added model to scene');
-
-                // Update cube reference
-                cube = model;
-
-                // Attach controls
-                transformControls.attach(cube);
-                console.log('Attached controls');
-
-                // Reset camera
-                camera.position.set(0, 0, 5);
-                camera.lookAt(0, 0, 0);
-                controls.reset();
-
-                // Force render
-                renderer.render(scene, camera);
-
-                // Cleanup
-                URL.revokeObjectURL(fileURL);
-            },
-            // Progress callback
-            function (xhr) {
-                const percent = (xhr.loaded / xhr.total * 100);
-                console.log(percent + '% loaded');
-            },
-            // Error callback
-            function (error) {
-                console.error('Error loading model:', error);
-                console.error('Error details:', error.message);
-                alert('Failed to load model. Check console for details.');
-                URL.revokeObjectURL(fileURL);
-            }
-        );
     });
-
-    return input;
 }
 
-// Initialize the model input field
-convertToModelInput('field00');
+// Initialize the upload functionality
+addModelUpload();
