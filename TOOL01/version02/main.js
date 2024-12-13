@@ -41,123 +41,62 @@ scene.add(cube);
 // Position camera
 camera.position.z = 5;
 
-// Animation loop without automatic movement
+// Add TransformControls
+const transformControls = new THREE.TransformControls(camera, renderer.domElement);
+transformControls.attach(cube);
+scene.add(transformControls);
+
+// Add keyboard controls for transform modes
+document.addEventListener('keydown', (event) => {
+    switch (event.key.toLowerCase()) {
+        case 'g':
+            transformControls.setMode('translate');
+            break;
+        case 'r':
+            transformControls.setMode('rotate');
+            break;
+        case 's':
+            transformControls.setMode('scale');
+            break;
+    }
+});
+
+// Create info plane (disabled)
+function createInfoPlane() {
+    return {
+        mesh: new THREE.Object3D(), // Return empty object
+        update: () => {} // Empty update function
+    };
+}
+
+// Create and add the info plane to the scene (disabled)
+const infoPlane = createInfoPlane();
+scene.add(infoPlane.mesh);
+
+// Animation loop
 function animate() {
     requestAnimationFrame(animate);
+    
+    // Update the text inside the element with id field02 with value of cube.position.x
+    document.getElementById('field02').textContent = cube.position.x.toFixed(2);
+    
+    // Update the text inside the element with id field03 with value of cube.position.y
+    document.getElementById('field03').textContent = cube.position.y.toFixed(2);
+    
+    // Update the text inside the element with id field04 with value of cube.position.z
+    document.getElementById('field04').textContent = cube.position.z.toFixed(2);
+
+    // Update the text inside the element with id field05 with value of cube.rotation.x
+    document.getElementById('field05').textContent = cube.rotation.x.toFixed(2);
+    
+    // Update the text inside the element with id field06 with value of cube.rotation.y
+    document.getElementById('field06').textContent = cube.rotation.y.toFixed(2);
+    
+    // Update the text inside the element with id field07 with value of cube.rotation.z
+    document.getElementById('field07').textContent = cube.rotation.z.toFixed(2);
     renderer.render(scene, camera);
 }
 animate();
-
-// Add keyboard controls for cube movement
-document.addEventListener('keydown', (event) => {
-    const speed = 0.1;
-    switch(event.key) {
-        case 'ArrowUp':
-            cubeProperties.position.y += speed;
-            cube.position.y = cubeProperties.position.y;
-            break;
-        case 'ArrowDown':
-            cubeProperties.position.y -= speed;
-            cube.position.y = cubeProperties.position.y;
-            break;
-        case 'ArrowLeft':
-            cubeProperties.position.x -= speed;
-            cube.position.x = cubeProperties.position.x;
-            break;
-        case 'ArrowRight':
-            cubeProperties.position.x += speed;
-            cube.position.x = cubeProperties.position.x;
-            break;
-        case 'PageUp':
-            cubeProperties.position.z -= speed;
-            cube.position.z = cubeProperties.position.z;
-            break;
-        case 'PageDown':
-            cubeProperties.position.z += speed;
-            cube.position.z = cubeProperties.position.z;
-            break;
-    }
-});
-
-// Mouse control variables
-let isDragging = false;
-let isRotating = false;
-let previousMousePosition = {
-    x: 0,
-    y: 0
-};
-
-// Add mouse event listeners
-renderer.domElement.addEventListener('mousedown', (e) => {
-    // Left click for position, right click for rotation
-    if (e.button === 0) {
-        isDragging = true;
-    } else if (e.button === 2) {
-        isRotating = true;
-        // Prevent context menu from showing up
-        e.preventDefault();
-    }
-    
-    previousMousePosition = {
-        x: e.clientX,
-        y: e.clientY
-    };
-});
-
-renderer.domElement.addEventListener('mousemove', (e) => {
-    const deltaMove = {
-        x: e.clientX - previousMousePosition.x,
-        y: e.clientY - previousMousePosition.y
-    };
-
-    if (isDragging) {
-        // Position movement
-        const movementSpeed = 0.01;
-        
-        cubeProperties.position.x += deltaMove.x * movementSpeed;
-        cubeProperties.position.y -= deltaMove.y * movementSpeed;
-        
-        cube.position.set(
-            cubeProperties.position.x,
-            cubeProperties.position.y,
-            cubeProperties.position.z
-        );
-    }
-
-    if (isRotating) {
-        // Rotation movement
-        const rotationSpeed = 0.01;
-        
-        cubeProperties.rotation.x += deltaMove.y * rotationSpeed;
-        cubeProperties.rotation.y += deltaMove.x * rotationSpeed;
-        
-        cube.rotation.set(
-            cubeProperties.rotation.x,
-            cubeProperties.rotation.y,
-            cubeProperties.rotation.z
-        );
-    }
-
-    previousMousePosition = {
-        x: e.clientX,
-        y: e.clientY
-    };
-});
-
-renderer.domElement.addEventListener('mouseup', (e) => {
-    if (e.button === 0) isDragging = false;
-    if (e.button === 2) isRotating = false;
-});
-
-renderer.domElement.addEventListener('mouseleave', () => {
-    isDragging = false;
-    isRotating = false;
-});
-
-// Prevent context menu from showing up on right click
-renderer.domElement.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-});
 
 // Handle window resize
 window.addEventListener('resize', () => {
