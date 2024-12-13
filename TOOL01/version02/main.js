@@ -164,17 +164,22 @@ convertToColorInput('field01', cubeProperties.color, value => {
 });
 
 // Scale inputs
-convertToRangeInput('range01', cube.scale.x, -5, 5, 1, value => {
+convertToRangeInput('range01', cube.scale.x, -5, 5, 0.5, value => {
     cube.scale.x = value;
-    document.getElementById('ValueRange01').textContent = value.toFixed(2);
+    const display = document.getElementById('ValueRange01');
+    if (display) display.textContent = value.toFixed(2);
 });
-convertToRangeInput('range02', cube.scale.y, -5, 5, 1, value => {
+
+convertToRangeInput('range02', cube.scale.y, -5, 5, 0.5, value => {
     cube.scale.y = value;
-    document.getElementById('ValueRange02').textContent = value.toFixed(2);
+    const display = document.getElementById('ValueRange02');
+    if (display) display.textContent = value.toFixed(2);
 });
-convertToRangeInput('range03', cube.scale.z, -5, 5, 1, value => {
+
+convertToRangeInput('range03', cube.scale.z, -5, 5, 0.5, value => {
     cube.scale.z = value;
-    document.getElementById('ValueRange03').textContent = value.toFixed(2);
+    const display = document.getElementById('ValueRange03');
+    if (display) display.textContent = value.toFixed(2);
 });
 
 // Event handlers
@@ -248,3 +253,36 @@ function animate() {
     renderer.render(scene, camera);
 }
 animate();
+
+// Update number input fields when transform controls change
+function updateNumberInputs() {
+    // Position
+    const posFields = {
+        'field02': cube.position.x,
+        'field03': cube.position.y,
+        'field04': cube.position.z
+    };
+    
+    // Rotation
+    const rotFields = {
+        'field05': cube.rotation.x,
+        'field06': cube.rotation.y,
+        'field07': cube.rotation.z
+    };
+    
+    Object.entries(posFields).forEach(([id, value]) => {
+        const input = document.getElementById(id);
+        if (input) input.value = value.toFixed(2);
+    });
+    
+    Object.entries(rotFields).forEach(([id, value]) => {
+        const input = document.getElementById(id);
+        if (input) input.value = value.toFixed(2);
+    });
+}
+
+// Add the update to transform controls
+transformControls.addEventListener('objectChange', () => {
+    updateRangeInputs();
+    updateNumberInputs();
+});
