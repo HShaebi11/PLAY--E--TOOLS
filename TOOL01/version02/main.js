@@ -54,14 +54,29 @@ controls.dampingFactor = 0.05;
 // Position camera
 camera.position.set(cameraPositionX, cameraPositionY, cameraPositionZ);
 
+// Add mouse movement variables
+let mouseX = 0;
+let mouseY = 0;
+let targetRotationX = 0;
+let targetRotationY = 0;
+const mouseSensitivity = 0.002;
+
+// Add mouse event listeners
+document.addEventListener('mousemove', (event) => {
+    mouseX = event.clientX - window.innerWidth / 2;
+    mouseY = event.clientY - window.innerHeight / 2;
+    
+    targetRotationY = mouseX * mouseSensitivity;
+    targetRotationX = mouseY * mouseSensitivity;
+});
+
 // Animation loop
 function animate() {
     requestAnimationFrame(animate);
     
-    // Update cube rotation
-    cube.rotation.x += rotationX;
-    cube.rotation.y += rotationY;
-    cube.rotation.z += rotationZ;
+    // Smooth rotation interpolation
+    cube.rotation.x += (targetRotationX - cube.rotation.x) * 0.05;
+    cube.rotation.y += (targetRotationY - cube.rotation.y) * 0.05;
     
     controls.update();
     renderer.render(scene, camera);
