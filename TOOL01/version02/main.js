@@ -128,9 +128,9 @@ function loadModel(url) {
             transformControls.attach(object);
             transformControls.setMode('translate');
 
-            // Initialize UI
-            reinitializeInputs();
-            initializeColorInput();
+            // Initialize UI only after object is loaded
+            initializeInputs();
+            initializeScaleDisplays();
             updateUIFromObject();
 
             renderer.render(scene, camera);
@@ -325,48 +325,53 @@ function convertToRangeInput(elementId, currentValue, minValue, maxValue, stepVa
 }
 
 // ===== Input Initialization =====
-// Position inputs
-convertToNumberInput('field02', object.position.x, -10, 10, 0.1, value => object.position.x = value);
-convertToNumberInput('field03', object.position.y, -10, 10, 0.1, value => object.position.y = value);
-convertToNumberInput('field04', object.position.z, -10, 10, 0.1, value => object.position.z = value);
+// Move these initial input conversions inside a function
+function initializeInputs() {
+    if (!object) return; // Don't initialize if no object exists
 
-// Rotation inputs
-convertToNumberInput('field05', object.rotation.x, -Math.PI, Math.PI, 0.1, value => object.rotation.x = value);
-convertToNumberInput('field06', object.rotation.y, -Math.PI, Math.PI, 0.1, value => object.rotation.y = value);
-convertToNumberInput('field07', object.rotation.z, -Math.PI, Math.PI, 0.1, value => object.rotation.z = value);
+    // Position inputs
+    convertToNumberInput('field02', object.position.x, -10, 10, 0.1, value => object.position.x = value);
+    convertToNumberInput('field03', object.position.y, -10, 10, 0.1, value => object.position.y = value);
+    convertToNumberInput('field04', object.position.z, -10, 10, 0.1, value => object.position.z = value);
 
-// Color input
-convertToColorInput('field01', objectProperties.color, value => {
-    objectProperties.color = value;
-    if (object) {
-        object.traverse((child) => {
-            if (child.isMesh && child.material) {
-                child.material.color.setHex(value);
-                child.material.userData.originalColor = value;
-            }
-        });
-    }
-    renderer.render(scene, camera);
-});
+    // Rotation inputs
+    convertToNumberInput('field05', object.rotation.x, -Math.PI, Math.PI, 0.1, value => object.rotation.x = value);
+    convertToNumberInput('field06', object.rotation.y, -Math.PI, Math.PI, 0.1, value => object.rotation.y = value);
+    convertToNumberInput('field07', object.rotation.z, -Math.PI, Math.PI, 0.1, value => object.rotation.z = value);
 
-// Scale inputs
-convertToRangeInput('range01', object.scale.x, -30, 30, 0.5, value => {
-    object.scale.x = value;
-    const display = document.getElementById('ValueRange01');
-    if (display) display.textContent = value.toFixed(2);
-});
+    // Color input
+    convertToColorInput('field01', objectProperties.color, value => {
+        objectProperties.color = value;
+        if (object) {
+            object.traverse((child) => {
+                if (child.isMesh && child.material) {
+                    child.material.color.setHex(value);
+                    child.material.userData.originalColor = value;
+                }
+            });
+        }
+        renderer.render(scene, camera);
+    });
 
-convertToRangeInput('range02', object.scale.y, -30, 30, 0.5, value => {
-    object.scale.y = value;
-    const display = document.getElementById('ValueRange02');
-    if (display) display.textContent = value.toFixed(2);
-});
+    // Scale inputs
+    convertToRangeInput('range01', object.scale.x, -30, 30, 0.5, value => {
+        object.scale.x = value;
+        const display = document.getElementById('ValueRange01');
+        if (display) display.textContent = value.toFixed(2);
+    });
 
-convertToRangeInput('range03', object.scale.z, -30, 30, 0.5, value => {
-    object.scale.z = value;
-    const display = document.getElementById('ValueRange03');
-    if (display) display.textContent = value.toFixed(2);
-});
+    convertToRangeInput('range02', object.scale.y, -30, 30, 0.5, value => {
+        object.scale.y = value;
+        const display = document.getElementById('ValueRange02');
+        if (display) display.textContent = value.toFixed(2);
+    });
+
+    convertToRangeInput('range03', object.scale.z, -30, 30, 0.5, value => {
+        object.scale.z = value;
+        const display = document.getElementById('ValueRange03');
+        if (display) display.textContent = value.toFixed(2);
+    });
+}
 
 // ===== Event Handlers =====
 function updateRangeInputs() {
@@ -456,17 +461,6 @@ transformControls.addEventListener('objectChange', () => {
 });
 transformControls.addEventListener('dragging-changed', event => controls.enabled = !event.value);
 
-// Initialize scale display
-['01', '02', '03'].forEach(suffix => {
-    const valueDisplay = document.getElementById(`ValueRange${suffix}`);
-    if (valueDisplay) {
-        const axis = ['x', 'y', 'z'][parseInt(suffix) - 1];
-        valueDisplay.textContent = object.scale[axis].toFixed(2);
-    } else {
-        console.warn(`Element ValueRange${suffix} not found`);
-    }
-});
-
 // ===== Animation and Rendering =====
 function animate() {
     requestAnimationFrame(animate);
@@ -496,149 +490,6 @@ function updateNumberInputs() {
     Object.entries(rotFields).forEach(([id, value]) => {
         const input = document.getElementById(id);
         if (input) input.value = value.toFixed(2);
-    });
-}
-
-// ===== Export Functionality =====
-// PDF Export
-const pdfButton = document.getElementById('pdfbutton');
-if (pdfButton) {
-    pdfButton.style.cursor = 'pointer';
-    pdfButton.style.userSelect = 'none';
-    pdfButton.setAttribute('role', 'button');
-    pdfButton.setAttribute('tabindex', '0');
-
-    pdfButton.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            this.click();
-        }
-    });
-
-    pdfButton.addEventListener('mousedown', function() {
-        this.style.transform = 'scale(0.98)';
-    });
-
-    pdfButton.addEventListener('mouseup', function() {
-        this.style.transform = 'scale(1)';
-    });
-
-    pdfButton.addEventListener('mouseleave', function() {
-        this.style.transform = 'scale(1)';
-    });
-
-    pdfButton.addEventListener('click', function() {
-        console.log('PDF button clicked');
-
-        try {
-            const wasVisible = transformControls.visible;
-            transformControls.visible = false;
-            renderer.render(scene, camera);
-            
-            const glCanvas = renderer.domElement;
-            const canvasWidth = glCanvas.width;
-            const canvasHeight = glCanvas.height;
-            const imgData = glCanvas.toDataURL('image/png');
-            
-            const doc = new jspdf.jsPDF({
-                orientation: canvasWidth > canvasHeight ? 'landscape' : 'portrait',
-                unit: 'px',
-                format: [canvasWidth, canvasHeight]
-            });
-
-            const now = new Date();
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const year = now.getFullYear();
-
-            const filename = `PLAY(E)—T1—${hours}:${minutes}—${day}${month}${year}.pdf`;
-
-            doc.addImage(imgData, 'PNG', 0, 0, canvasWidth, canvasHeight);
-            doc.save(filename);
-            
-            transformControls.visible = wasVisible;
-            renderer.render(scene, camera);
-            
-            console.log('PDF generated successfully');
-
-        } catch (error) {
-            console.error('Error generating PDF:', error);
-            console.error('Error details:', error.message);
-        }
-    });
-}
-
-// SVG Export
-const svgButton = document.getElementById('svgbutton');
-if (svgButton) {
-    svgButton.style.cursor = 'pointer';
-    svgButton.style.userSelect = 'none';
-    svgButton.setAttribute('role', 'button');
-    svgButton.setAttribute('tabindex', '0');
-
-    svgButton.addEventListener('click', function() {
-        console.log('SVG button clicked');
-
-        try {
-            const wasVisible = transformControls.visible;
-            transformControls.visible = false;
-            renderer.render(scene, camera);
-            
-            const glCanvas = renderer.domElement;
-            const canvasWidth = glCanvas.width;
-            const canvasHeight = glCanvas.height;
-            
-            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-            svg.setAttribute('width', canvasWidth);
-            svg.setAttribute('height', canvasHeight);
-            svg.setAttribute('viewBox', `0 0 ${canvasWidth} ${canvasHeight}`);
-            
-            const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
-            img.setAttribute('width', canvasWidth);
-            img.setAttribute('height', canvasHeight);
-            img.setAttribute('href', glCanvas.toDataURL('image/png'));
-            svg.appendChild(img);
-            
-            const svgData = new XMLSerializer().serializeToString(svg);
-            const link = document.createElement('a');
-            const blob = new Blob([svgData], { type: 'image/svg+xml' });
-            const url = window.URL.createObjectURL(blob);
-            
-            const now = new Date();
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const year = now.getFullYear();
-
-            link.download = `PLAY(E)—T1—${hours}:${minutes}—${day}${month}${year}.svg`;
-            link.href = url;
-            link.click();
-            
-            window.URL.revokeObjectURL(url);
-            transformControls.visible = wasVisible;
-            renderer.render(scene, camera);
-            
-            console.log('SVG generated successfully');
-
-        } catch (error) {
-            console.error('Error generating SVG:', error);
-            console.error('Error details:', error.message);
-        }
-    });
-
-    svgButton.addEventListener('mousedown', function() {
-        this.style.transform = 'scale(0.98)';
-    });
-
-    svgButton.addEventListener('mouseup', function() {
-        this.style.transform = 'scale(1)';
-    });
-
-    svgButton.addEventListener('mouseleave', function() {
-        this.style.transform = 'scale(1)';
     });
 }
 
@@ -720,3 +571,147 @@ function initializeColorInput() {
 
 // Make sure to initialize color input when the page loads
 initializeColorInput();
+
+// ===== Export Functions =====
+function setupExportButtons() {
+    const pdfButton = document.getElementById('pdfbutton');
+    const svgButton = document.getElementById('svgbutton');
+
+    if (!pdfButton || !svgButton) {
+        console.error('Export buttons not found');
+        return;
+    }
+
+    pdfButton.addEventListener('click', async function() {
+        if (!object) {
+            alert('Please load a 3D model first');
+            return;
+        }
+
+        // Hide transform controls temporarily
+        const wasVisible = transformControls.visible;
+        transformControls.visible = false;
+        renderer.render(scene, camera);
+
+        try {
+            // Get the canvas data
+            const canvas = renderer.domElement;
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            
+            // Create PDF
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({
+                orientation: 'landscape',
+                unit: 'px',
+                format: [canvas.width, canvas.height]
+            });
+
+            // Add the image
+            const imgData = canvas.toDataURL('image/png');
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+
+            // Convert to blob and force download
+            const pdfBlob = pdf.output('blob');
+            const blobUrl = URL.createObjectURL(pdfBlob);
+            
+            const downloadLink = document.createElement('a');
+            downloadLink.href = blobUrl;
+            downloadLink.download = `3d-model-${timestamp}.pdf`;
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            
+            // Cleanup
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+
+        } catch (error) {
+            console.error('PDF Export Error:', error);
+            alert('Failed to export PDF. Please check console for details.');
+        } finally {
+            // Restore transform controls
+            transformControls.visible = wasVisible;
+            renderer.render(scene, camera);
+        }
+    });
+
+    svgButton.addEventListener('click', function() {
+        if (!object) {
+            alert('Please load a 3D model first');
+            return;
+        }
+
+        // Hide transform controls temporarily
+        const wasVisible = transformControls.visible;
+        transformControls.visible = false;
+        renderer.render(scene, camera);
+
+        try {
+            // Get the canvas
+            const canvas = renderer.domElement;
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            
+            // Get canvas data as PNG (since direct SVG conversion might not work well with WebGL)
+            const imgData = canvas.toDataURL('image/png');
+            
+            // Create a simple SVG wrapper around the image
+            const svgContent = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}">
+                    <image width="100%" height="100%" href="${imgData}"/>
+                </svg>
+            `;
+            
+            // Create blob and force download
+            const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+            const blobUrl = URL.createObjectURL(blob);
+            
+            const downloadLink = document.createElement('a');
+            downloadLink.href = blobUrl;
+            downloadLink.download = `3d-model-${timestamp}.svg`;
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            
+            // Cleanup
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+
+        } catch (error) {
+            console.error('SVG Export Error:', error);
+            alert('Failed to export SVG. Please check console for details.');
+        } finally {
+            // Restore transform controls
+            transformControls.visible = wasVisible;
+            renderer.render(scene, camera);
+        }
+    });
+}
+
+// Initialize export buttons when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Load jsPDF library
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    script.onload = setupExportButtons;
+    script.onerror = () => console.error('Failed to load jsPDF library');
+    document.head.appendChild(script);
+});
+
+// Add this to your existing window resize handler
+window.addEventListener('resize', function() {
+    handleResize();
+    if (object) {
+        renderer.render(scene, camera);
+    }
+});
+
+// Add a new function to safely initialize scale displays
+function initializeScaleDisplays() {
+    if (!object) return;  // Guard clause
+    
+    ['01', '02', '03'].forEach(suffix => {
+        const valueDisplay = document.getElementById(`ValueRange${suffix}`);
+        if (valueDisplay) {
+            const axis = ['x', 'y', 'z'][parseInt(suffix) - 1];
+            valueDisplay.textContent = object.scale[axis].toFixed(2);
+        }
+    });
+}
