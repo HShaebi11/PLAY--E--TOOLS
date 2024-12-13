@@ -286,3 +286,92 @@ transformControls.addEventListener('objectChange', () => {
     updateRangeInputs();
     updateNumberInputs();
 });
+
+// PDF Export functionality
+const pdfButton = document.getElementById('pdfbutton');
+if (pdfButton) {
+    // Make div behave like a button
+    pdfButton.style.cursor = 'pointer';
+    pdfButton.style.userSelect = 'none';  // Prevent text selection
+    pdfButton.setAttribute('role', 'button');  // Accessibility
+    pdfButton.setAttribute('tabindex', '0');   // Make it focusable
+
+    // Add keyboard support for accessibility
+    pdfButton.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            this.click();
+        }
+    });
+
+    // Add visual feedback on interaction
+    pdfButton.addEventListener('mousedown', function() {
+        this.style.transform = 'scale(0.98)';
+    });
+
+    pdfButton.addEventListener('mouseup', function() {
+        this.style.transform = 'scale(1)';
+    });
+
+    pdfButton.addEventListener('mouseleave', function() {
+        this.style.transform = 'scale(1)';
+    });
+
+    pdfButton.addEventListener('click', function() {
+        console.log('PDF button clicked');
+
+        try {
+            // Temporarily hide transform controls
+            const wasVisible = transformControls.visible;
+            transformControls.visible = false;
+            
+            // Force a render to update the view without gizmo
+            renderer.render(scene, camera);
+            
+            // Get the WebGL canvas
+            const glCanvas = renderer.domElement;
+            
+            // Get canvas dimensions
+            const canvasWidth = glCanvas.width;
+            const canvasHeight = glCanvas.height;
+            
+            // Get the image data
+            const imgData = glCanvas.toDataURL('image/png');
+            
+            // Create PDF with canvas dimensions
+            const doc = new jspdf.jsPDF({
+                orientation: canvasWidth > canvasHeight ? 'landscape' : 'portrait',
+                unit: 'px',
+                format: [canvasWidth, canvasHeight]
+            });
+
+            // Get current date and time
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = now.getFullYear();
+
+            const filename = `PLAY(E)—T1—${hours}:${minutes}—${day}${month}${year}.pdf`;
+
+            // Add the image to PDF with exact canvas dimensions
+            doc.addImage(imgData, 'PNG', 0, 0, canvasWidth, canvasHeight);
+            
+            // Save the PDF
+            doc.save(filename);
+            
+            // Restore transform controls visibility
+            transformControls.visible = wasVisible;
+            
+            // Re-render to show gizmo again
+            renderer.render(scene, camera);
+            
+            console.log('PDF generated successfully');
+
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            console.error('Error details:', error.message);
+        }
+    });
+}
