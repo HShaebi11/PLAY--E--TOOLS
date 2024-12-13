@@ -1,4 +1,4 @@
-// Scene setup
+// ===== Scene, Camera, and Renderer Setup =====
 const scene = new THREE.Scene();
 const container = document.querySelector('#three-container');
 const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
@@ -6,15 +6,14 @@ const renderer = new THREE.WebGLRenderer({
     alpha: true,
     antialias: true 
 });
+
 renderer.setSize(container.clientWidth, container.clientHeight);
 renderer.setClearColor(0x000000, 0); // transparent background
 container.appendChild(renderer.domElement);
-
-// Make renderer responsive
 renderer.domElement.style.width = '100%';
 renderer.domElement.style.height = '100%';
 
-// Lighting
+// ===== Lighting Setup =====
 const ambientLight = new THREE.AmbientLight(0x404040, 2);
 scene.add(ambientLight);
 
@@ -22,37 +21,213 @@ const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
 directionalLight.position.set(5, 5, 5);
 scene.add(directionalLight);
 
-// Cube properties and creation
-const cubeProperties = {
+// ===== Initial Properties =====
+const objectProperties = {
     position: { x: 0, y: 0, z: 0 },
     rotation: { x: 0, y: 0, z: 0 },
     scale: { x: 1, y: 1, z: 1 },
     color: 0x00ff00
 };
 
-const geometry = new THREE.BoxGeometry(1, 1, 1);
-const material = new THREE.MeshPhongMaterial({ color: cubeProperties.color });
-const cube = new THREE.Mesh(geometry, material);
+// ===== Model Setup =====
+let object; // Will store our current model
+const loader = new THREE.GLTFLoader();
 
-// Apply initial cube properties
-cube.position.set(cubeProperties.position.x, cubeProperties.position.y, cubeProperties.position.z);
-cube.rotation.set(cubeProperties.rotation.x, cubeProperties.rotation.y, cubeProperties.rotation.z);
-cube.scale.set(cubeProperties.scale.x, cubeProperties.scale.y, cubeProperties.scale.z);
-scene.add(cube);
-
-// Camera setup
+// ===== Camera and Controls Setup =====
+// Fixed camera position
 camera.position.set(0, 0, 5);
 camera.lookAt(0, 0, 0);
 
-// Controls setup
-const controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
+// Remove OrbitControls completely
+// const controls = new THREE.OrbitControls(camera, renderer.domElement);
+// Instead, make the camera completely static
 
+// Transform controls setup with fixed camera
 const transformControls = new THREE.TransformControls(camera, renderer.domElement);
-transformControls.attach(cube);
 scene.add(transformControls);
 
-// Input conversion utilities
+// Simplified animation loop without orbit controls
+function animate() {
+    requestAnimationFrame(animate);
+    renderer.render(scene, camera);
+}
+
+// Transform controls event listeners
+transformControls.addEventListener('change', function() {
+    renderer.render(scene, camera);
+});
+
+transformControls.addEventListener('objectChange', function() {
+    if (object) {
+        updateUIFromObject();
+    }
+});
+
+// Keyboard shortcuts for transform modes
+document.addEventListener('keydown', function(event) {
+    switch(event.key.toLowerCase()) {
+        case 'g':
+            transformControls.setMode('translate');
+            break;
+        case 'r':
+            transformControls.setMode('rotate');
+            break;
+        case 's':
+            transformControls.setMode('scale');
+            break;
+    }
+});
+
+// ===== Model Loading Function =====
+function loadModel(url) {
+    loader.load(
+        url,
+        function (gltf) {
+            if (object) {
+                transformControls.detach();
+                scene.remove(object);
+                if (object.geometry) object.geometry.dispose();
+                if (object.material) {
+                    if (Array.isArray(object.material)) {
+                        object.material.forEach(mat => mat.dispose());
+                    } else {
+                        object.material.dispose();
+                    }
+                }
+            }
+
+            const model = gltf.scene;
+            
+            // Center the model
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            model.position.sub(center);
+
+            // Apply initial properties
+            model.position.set(objectProperties.position.x, objectProperties.position.y, objectProperties.position.z);
+            model.rotation.set(objectProperties.rotation.x, objectProperties.rotation.y, objectProperties.rotation.z);
+            model.scale.set(objectProperties.scale.x, objectProperties.scale.y, objectProperties.scale.z);
+
+            // Apply materials and color
+            model.traverse((child) => {
+                if (child.isMesh) {
+                    child.material = new THREE.MeshPhongMaterial({ 
+                        color: objectProperties.color 
+                    });
+                    child.material.userData = {
+                        originalColor: objectProperties.color
+                    };
+                }
+            });
+
+            // Add to scene and setup controls
+            object = model;
+            scene.add(object);
+            
+            // Attach transform controls
+            transformControls.attach(object);
+            transformControls.setMode('translate');
+
+            // Initialize UI
+            reinitializeInputs();
+            initializeColorInput();
+            updateUIFromObject();
+
+            renderer.render(scene, camera);
+        },
+        undefined,
+        function (error) {
+            console.error('Error loading model:', error);
+            alert('Failed to load model');
+        }
+    );
+}
+
+// ===== File Upload Handler =====
+function addModelUpload() {
+    const uploadButton = document.getElementById('upload');
+    if (!uploadButton) {
+        console.warn('Upload button not found');
+        return;
+    }
+
+    uploadButton.style.cursor = 'pointer';
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.glb,.gltf';
+    input.style.display = 'none';
+    uploadButton.appendChild(input);
+
+    uploadButton.addEventListener('click', () => input.click());
+
+    input.addEventListener('change', function(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const fileURL = URL.createObjectURL(file);
+            loadModel(fileURL);
+            URL.revokeObjectURL(fileURL); // Clean up the URL
+        }
+    });
+}
+
+// Initialize upload functionality
+addModelUpload();
+
+// ===== Input Reinitialization =====
+function reinitializeInputs() {
+    // Position inputs
+    convertToNumberInput('field02', object.position.x, -10, 10, 0.1, value => {
+        object.position.x = value;
+        renderer.render(scene, camera);
+    });
+    convertToNumberInput('field03', object.position.y, -10, 10, 0.1, value => {
+        object.position.y = value;
+        renderer.render(scene, camera);
+    });
+    convertToNumberInput('field04', object.position.z, -10, 10, 0.1, value => {
+        object.position.z = value;
+        renderer.render(scene, camera);
+    });
+
+    // Rotation inputs
+    convertToNumberInput('field05', object.rotation.x, -Math.PI, Math.PI, 0.1, value => {
+        object.rotation.x = value;
+        renderer.render(scene, camera);
+    });
+    convertToNumberInput('field06', object.rotation.y, -Math.PI, Math.PI, 0.1, value => {
+        object.rotation.y = value;
+        renderer.render(scene, camera);
+    });
+    convertToNumberInput('field07', object.rotation.z, -Math.PI, Math.PI, 0.1, value => {
+        object.rotation.z = value;
+        renderer.render(scene, camera);
+    });
+
+    // Scale inputs
+    convertToRangeInput('range01', object.scale.x, -30, 30, 0.5, value => {
+        object.scale.x = value;
+        const display = document.getElementById('ValueRange01');
+        if (display) display.textContent = value.toFixed(2);
+        renderer.render(scene, camera);
+    });
+
+    convertToRangeInput('range02', object.scale.y, -30, 30, 0.5, value => {
+        object.scale.y = value;
+        const display = document.getElementById('ValueRange02');
+        if (display) display.textContent = value.toFixed(2);
+        renderer.render(scene, camera);
+    });
+
+    convertToRangeInput('range03', object.scale.z, -30, 30, 0.5, value => {
+        object.scale.z = value;
+        const display = document.getElementById('ValueRange03');
+        if (display) display.textContent = value.toFixed(2);
+        renderer.render(scene, camera);
+    });
+}
+
+// ===== Input Conversion Utilities =====
 function convertToNumberInput(elementId, currentValue, minValue, maxValue, stepValue, updateCallback) {
     const element = document.getElementById(elementId);
     if (!element) {
@@ -95,7 +270,10 @@ function convertToNumberInput(elementId, currentValue, minValue, maxValue, stepV
 
 function convertToColorInput(elementId, currentColor, updateCallback) {
     const element = document.getElementById(elementId);
-    if (!element) return;
+    if (!element) {
+        console.warn(`Color input element ${elementId} not found`);
+        return;
+    }
 
     const input = document.createElement('input');
     input.type = 'color';
@@ -146,49 +324,57 @@ function convertToRangeInput(elementId, currentValue, minValue, maxValue, stepVa
     return input;
 }
 
-// Initialize inputs
+// ===== Input Initialization =====
 // Position inputs
-convertToNumberInput('field02', cube.position.x, -10, 10, 0.1, value => cube.position.x = value);
-convertToNumberInput('field03', cube.position.y, -10, 10, 0.1, value => cube.position.y = value);
-convertToNumberInput('field04', cube.position.z, -10, 10, 0.1, value => cube.position.z = value);
+convertToNumberInput('field02', object.position.x, -10, 10, 0.1, value => object.position.x = value);
+convertToNumberInput('field03', object.position.y, -10, 10, 0.1, value => object.position.y = value);
+convertToNumberInput('field04', object.position.z, -10, 10, 0.1, value => object.position.z = value);
 
 // Rotation inputs
-convertToNumberInput('field05', cube.rotation.x, -Math.PI, Math.PI, 0.1, value => cube.rotation.x = value);
-convertToNumberInput('field06', cube.rotation.y, -Math.PI, Math.PI, 0.1, value => cube.rotation.y = value);
-convertToNumberInput('field07', cube.rotation.z, -Math.PI, Math.PI, 0.1, value => cube.rotation.z = value);
+convertToNumberInput('field05', object.rotation.x, -Math.PI, Math.PI, 0.1, value => object.rotation.x = value);
+convertToNumberInput('field06', object.rotation.y, -Math.PI, Math.PI, 0.1, value => object.rotation.y = value);
+convertToNumberInput('field07', object.rotation.z, -Math.PI, Math.PI, 0.1, value => object.rotation.z = value);
 
 // Color input
-convertToColorInput('field01', cubeProperties.color, value => {
-    cubeProperties.color = value;
-    material.color.setHex(value);
+convertToColorInput('field01', objectProperties.color, value => {
+    objectProperties.color = value;
+    if (object) {
+        object.traverse((child) => {
+            if (child.isMesh && child.material) {
+                child.material.color.setHex(value);
+                child.material.userData.originalColor = value;
+            }
+        });
+    }
+    renderer.render(scene, camera);
 });
 
 // Scale inputs
-convertToRangeInput('range01', cube.scale.x, -30, 30, 0.5, value => {
-    cube.scale.x = value;
+convertToRangeInput('range01', object.scale.x, -30, 30, 0.5, value => {
+    object.scale.x = value;
     const display = document.getElementById('ValueRange01');
     if (display) display.textContent = value.toFixed(2);
 });
 
-convertToRangeInput('range02', cube.scale.y, -30, 30, 0.5, value => {
-    cube.scale.y = value;
+convertToRangeInput('range02', object.scale.y, -30, 30, 0.5, value => {
+    object.scale.y = value;
     const display = document.getElementById('ValueRange02');
     if (display) display.textContent = value.toFixed(2);
 });
 
-convertToRangeInput('range03', cube.scale.z, -30, 30, 0.5, value => {
-    cube.scale.z = value;
+convertToRangeInput('range03', object.scale.z, -30, 30, 0.5, value => {
+    object.scale.z = value;
     const display = document.getElementById('ValueRange03');
     if (display) display.textContent = value.toFixed(2);
 });
 
-// Event handlers
+// ===== Event Handlers =====
 function updateRangeInputs() {
     ['01', '02', '03'].forEach(suffix => {
         const range = document.getElementById(`range${suffix}`);
         const valueDisplay = document.getElementById(`ValueRange${suffix}`);
         const axis = ['x', 'y', 'z'][parseInt(suffix) - 1];
-        const value = cube.scale[axis];
+        const value = object.scale[axis];
         
         if (range) {
             range.value = value;
@@ -222,52 +408,84 @@ function handleKeyDown(event) {
     }
 }
 
-// Event listeners
+// ===== Event Listeners =====
 window.addEventListener('resize', handleResize);
 document.addEventListener('keydown', handleKeyDown);
-transformControls.addEventListener('objectChange', updateRangeInputs);
+transformControls.addEventListener('objectChange', () => {
+    if (object) {
+        // Update position inputs
+        const posInputs = {
+            'field02': object.position.x,
+            'field03': object.position.y,
+            'field04': object.position.z
+        };
+
+        // Update rotation inputs
+        const rotInputs = {
+            'field05': object.rotation.x,
+            'field06': object.rotation.y,
+            'field07': object.rotation.z
+        };
+
+        // Update scale inputs
+        const scaleInputs = {
+            'range01': object.scale.x,
+            'range02': object.scale.y,
+            'range03': object.scale.z
+        };
+
+        // Update position and rotation number inputs
+        Object.entries(posInputs).forEach(([id, value]) => {
+            const input = document.getElementById(id);
+            if (input) input.value = value.toFixed(2);
+        });
+
+        Object.entries(rotInputs).forEach(([id, value]) => {
+            const input = document.getElementById(id);
+            if (input) input.value = value.toFixed(2);
+        });
+
+        // Update scale range inputs and their displays
+        Object.entries(scaleInputs).forEach(([id, value], index) => {
+            const input = document.getElementById(id);
+            const display = document.getElementById(`ValueRange0${index + 1}`);
+            if (input) input.value = value;
+            if (display) display.textContent = value.toFixed(2);
+        });
+    }
+});
 transformControls.addEventListener('dragging-changed', event => controls.enabled = !event.value);
 
-// Initialize scale display with error checking
+// Initialize scale display
 ['01', '02', '03'].forEach(suffix => {
     const valueDisplay = document.getElementById(`ValueRange${suffix}`);
     if (valueDisplay) {
         const axis = ['x', 'y', 'z'][parseInt(suffix) - 1];
-        valueDisplay.textContent = cube.scale[axis].toFixed(2);
+        valueDisplay.textContent = object.scale[axis].toFixed(2);
     } else {
         console.warn(`Element ValueRange${suffix} not found`);
     }
 });
 
-// Cleanup function
-function cleanup() {
-    window.removeEventListener('resize', handleResize);
-    document.removeEventListener('keydown', handleKeyDown);
-    controls.dispose();
-    transformControls.dispose();
-}
-
-// Animation loop
+// ===== Animation and Rendering =====
 function animate() {
     requestAnimationFrame(animate);
     renderer.render(scene, camera);
 }
 animate();
 
-// Update number input fields when transform controls change
+// ===== UI Updates =====
 function updateNumberInputs() {
-    // Position
     const posFields = {
-        'field02': cube.position.x,
-        'field03': cube.position.y,
-        'field04': cube.position.z
+        'field02': object.position.x,
+        'field03': object.position.y,
+        'field04': object.position.z
     };
     
-    // Rotation
     const rotFields = {
-        'field05': cube.rotation.x,
-        'field06': cube.rotation.y,
-        'field07': cube.rotation.z
+        'field05': object.rotation.x,
+        'field06': object.rotation.y,
+        'field07': object.rotation.z
     };
     
     Object.entries(posFields).forEach(([id, value]) => {
@@ -281,22 +499,15 @@ function updateNumberInputs() {
     });
 }
 
-// Add the update to transform controls
-transformControls.addEventListener('objectChange', () => {
-    updateRangeInputs();
-    updateNumberInputs();
-});
-
-// PDF Export functionality
+// ===== Export Functionality =====
+// PDF Export
 const pdfButton = document.getElementById('pdfbutton');
 if (pdfButton) {
-    // Make div behave like a button
     pdfButton.style.cursor = 'pointer';
-    pdfButton.style.userSelect = 'none';  // Prevent text selection
-    pdfButton.setAttribute('role', 'button');  // Accessibility
-    pdfButton.setAttribute('tabindex', '0');   // Make it focusable
+    pdfButton.style.userSelect = 'none';
+    pdfButton.setAttribute('role', 'button');
+    pdfButton.setAttribute('tabindex', '0');
 
-    // Add keyboard support for accessibility
     pdfButton.addEventListener('keydown', function(e) {
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
@@ -304,7 +515,6 @@ if (pdfButton) {
         }
     });
 
-    // Add visual feedback on interaction
     pdfButton.addEventListener('mousedown', function() {
         this.style.transform = 'scale(0.98)';
     });
@@ -321,31 +531,21 @@ if (pdfButton) {
         console.log('PDF button clicked');
 
         try {
-            // Temporarily hide transform controls
             const wasVisible = transformControls.visible;
             transformControls.visible = false;
-            
-            // Force a render to update the view without gizmo
             renderer.render(scene, camera);
             
-            // Get the WebGL canvas
             const glCanvas = renderer.domElement;
-            
-            // Get canvas dimensions
             const canvasWidth = glCanvas.width;
             const canvasHeight = glCanvas.height;
-            
-            // Get the image data
             const imgData = glCanvas.toDataURL('image/png');
             
-            // Create PDF with canvas dimensions
             const doc = new jspdf.jsPDF({
                 orientation: canvasWidth > canvasHeight ? 'landscape' : 'portrait',
                 unit: 'px',
                 format: [canvasWidth, canvasHeight]
             });
 
-            // Get current date and time
             const now = new Date();
             const hours = String(now.getHours()).padStart(2, '0');
             const minutes = String(now.getMinutes()).padStart(2, '0');
@@ -355,16 +555,10 @@ if (pdfButton) {
 
             const filename = `PLAY(E)—T1—${hours}:${minutes}—${day}${month}${year}.pdf`;
 
-            // Add the image to PDF with exact canvas dimensions
             doc.addImage(imgData, 'PNG', 0, 0, canvasWidth, canvasHeight);
-            
-            // Save the PDF
             doc.save(filename);
             
-            // Restore transform controls visibility
             transformControls.visible = wasVisible;
-            
-            // Re-render to show gizmo again
             renderer.render(scene, camera);
             
             console.log('PDF generated successfully');
@@ -376,7 +570,7 @@ if (pdfButton) {
     });
 }
 
-// SVG Export functionality
+// SVG Export
 const svgButton = document.getElementById('svgbutton');
 if (svgButton) {
     svgButton.style.cursor = 'pointer';
@@ -388,40 +582,30 @@ if (svgButton) {
         console.log('SVG button clicked');
 
         try {
-            // Temporarily hide transform controls
             const wasVisible = transformControls.visible;
             transformControls.visible = false;
-            
-            // Force a render
             renderer.render(scene, camera);
             
-            // Get the canvas data
             const glCanvas = renderer.domElement;
             const canvasWidth = glCanvas.width;
             const canvasHeight = glCanvas.height;
             
-            // Create SVG
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             svg.setAttribute('width', canvasWidth);
             svg.setAttribute('height', canvasHeight);
             svg.setAttribute('viewBox', `0 0 ${canvasWidth} ${canvasHeight}`);
             
-            // Create image element in SVG using canvas data
             const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
             img.setAttribute('width', canvasWidth);
             img.setAttribute('height', canvasHeight);
             img.setAttribute('href', glCanvas.toDataURL('image/png'));
             svg.appendChild(img);
             
-            // Convert SVG to string
             const svgData = new XMLSerializer().serializeToString(svg);
-            
-            // Create download link
             const link = document.createElement('a');
             const blob = new Blob([svgData], { type: 'image/svg+xml' });
             const url = window.URL.createObjectURL(blob);
             
-            // Get current date and time for filename
             const now = new Date();
             const hours = String(now.getHours()).padStart(2, '0');
             const minutes = String(now.getMinutes()).padStart(2, '0');
@@ -433,10 +617,7 @@ if (svgButton) {
             link.href = url;
             link.click();
             
-            // Cleanup
             window.URL.revokeObjectURL(url);
-            
-            // Restore transform controls visibility
             transformControls.visible = wasVisible;
             renderer.render(scene, camera);
             
@@ -448,7 +629,6 @@ if (svgButton) {
         }
     });
 
-    // Add visual feedback
     svgButton.addEventListener('mousedown', function() {
         this.style.transform = 'scale(0.98)';
     });
@@ -462,81 +642,81 @@ if (svgButton) {
     });
 }
 
-// Add GLTFLoader
-const loader = new THREE.GLTFLoader();
+// ===== Cleanup =====
+function cleanup() {
+    window.removeEventListener('resize', handleResize);
+    document.removeEventListener('keydown', handleKeyDown);
+    controls.dispose();
+    transformControls.dispose();
+}
 
-// Add file handling to existing upload button
-function addModelUpload() {
-    const uploadButton = document.getElementById('upload');
-    if (!uploadButton) {
-        console.warn('Upload button not found');
-        return;
+// Transform Controls Event Listeners
+transformControls.addEventListener('dragging-changed', event => {
+    controls.enabled = !event.value;
+});
+
+transformControls.addEventListener('objectChange', () => {
+    if (object) {
+        updateUIFromObject();
     }
+});
 
-    // Make button clickable
-    uploadButton.style.cursor = 'pointer';
+// Function to update UI from object properties
+function updateUIFromObject() {
+    // Update position inputs
+    document.getElementById('field02').value = object.position.x.toFixed(2);
+    document.getElementById('field03').value = object.position.y.toFixed(2);
+    document.getElementById('field04').value = object.position.z.toFixed(2);
 
-    // Create hidden file input
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.glb,.gltf';
-    input.style.display = 'none';
-    uploadButton.appendChild(input);
+    // Update rotation inputs
+    document.getElementById('field05').value = object.rotation.x.toFixed(2);
+    document.getElementById('field06').value = object.rotation.y.toFixed(2);
+    document.getElementById('field07').value = object.rotation.z.toFixed(2);
 
-    // Click handler for the upload button
-    uploadButton.addEventListener('click', () => {
-        input.click();
-    });
+    // Update scale inputs and displays
+    const scaleX = document.getElementById('range01');
+    const scaleY = document.getElementById('range02');
+    const scaleZ = document.getElementById('range03');
+    
+    if (scaleX) scaleX.value = object.scale.x;
+    if (scaleY) scaleY.value = object.scale.y;
+    if (scaleZ) scaleZ.value = object.scale.z;
 
-    // File input change handler
-    input.addEventListener('change', function(event) {
-        const file = event.target.files[0];
-        if (file) {
-            const fileURL = URL.createObjectURL(file);
+    document.getElementById('ValueRange01').textContent = object.scale.x.toFixed(2);
+    document.getElementById('ValueRange02').textContent = object.scale.y.toFixed(2);
+    document.getElementById('ValueRange03').textContent = object.scale.z.toFixed(2);
+}
 
-            // Load the new model
-            loader.load(
-                fileURL,
-                function (gltf) {
-                    // Detach controls before modifying cube
-                    transformControls.detach();
+// Keyboard controls for transform modes
+document.addEventListener('keydown', function(event) {
+    switch(event.key.toLowerCase()) {
+        case 'g':
+            transformControls.setMode('translate');
+            break;
+        case 'r':
+            transformControls.setMode('rotate');
+            break;
+        case 's':
+            transformControls.setMode('scale');
+            break;
+    }
+});
 
-                    // Remove all children from cube
-                    while(cube.children.length > 0) {
-                        cube.remove(cube.children[0]);
-                    }
-
-                    // Add model as child of cube
-                    const model = gltf.scene;
-                    
-                    // Apply color to model
-                    model.traverse((child) => {
-                        if (child.isMesh) {
-                            child.material.color = new THREE.Color(color);
-                        }
-                    });
-                    
-                    cube.add(model);
-                    
-                    // Reattach transform controls to cube
-                    transformControls.attach(cube);
-                    
-                    // Render the scene
-                    renderer.render(scene, camera);
-                    
-                    // Cleanup
-                    URL.revokeObjectURL(fileURL);
-                },
-                undefined,
-                function (error) {
-                    console.error('Error loading model:', error);
-                    alert('Failed to load model');
-                    URL.revokeObjectURL(fileURL);
+// Update the color input initialization and handling
+function initializeColorInput() {
+    convertToColorInput('field01', objectProperties.color, value => {
+        objectProperties.color = value;
+        if (object) {
+            object.traverse((child) => {
+                if (child.isMesh && child.material) {
+                    child.material.color.setHex(value);
+                    child.material.userData.originalColor = value;
                 }
-            );
+            });
         }
+        renderer.render(scene, camera);
     });
 }
 
-// Initialize the upload functionality
-addModelUpload();
+// Make sure to initialize color input when the page loads
+initializeColorInput();
