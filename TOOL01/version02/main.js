@@ -1,7 +1,7 @@
 // Scene setup
 const scene = new THREE.Scene();
 const container = document.querySelector('#three-container');
-const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(100, container.clientWidth / container.clientHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(container.clientWidth, container.clientHeight);
 container.appendChild(renderer.domElement);
@@ -13,9 +13,9 @@ let rotationZ = 0;
 let positionX = 0;
 let positionY = 0;
 let positionZ = 0;
-let scaleX = 1;
-let scaleY = 1;
-let scaleZ = 1;
+let scaleX = 3;
+let scaleY = 3;
+let scaleZ = 3;
 let colour = new THREE.Color(0x00ff00); // Green color
 let cameraPositionX = 0;  // Add camera X position
 let cameraPositionY = 0;  // Add camera Y position
