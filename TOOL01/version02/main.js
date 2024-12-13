@@ -17,6 +17,18 @@ let scaleX = 1;
 let scaleY = 1;
 let scaleZ = 1;
 let colour = new THREE.Color(0x00ff00); // Green color
+let cameraPositionX = 0;  // Add camera X position
+let cameraPositionY = 0;  // Add camera Y position
+let cameraPositionZ = 5;  // Existing camera Z position
+
+// Light variables
+let ambientLightColor = 0x404040;
+let ambientLightIntensity = 1;
+let directionalLightColor = 0xffffff;
+let directionalLightIntensity = 1;
+let directionalLightX = 1;
+let directionalLightY = 1;
+let directionalLightZ = 1;
 
 // Create cube
 const geometry = new THREE.BoxGeometry();
@@ -27,11 +39,11 @@ cube.scale.set(scaleX, scaleY, scaleZ);
 scene.add(cube);
 
 // Add lights
-const ambientLight = new THREE.AmbientLight(0x404040);
+const ambientLight = new THREE.AmbientLight(ambientLightColor, ambientLightIntensity);
 scene.add(ambientLight);
 
-const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-directionalLight.position.set(1, 1, 1);
+const directionalLight = new THREE.DirectionalLight(directionalLightColor, directionalLightIntensity);
+directionalLight.position.set(directionalLightX, directionalLightY, directionalLightZ);
 scene.add(directionalLight);
 
 // Add OrbitControls
@@ -40,7 +52,7 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 
 // Position camera
-camera.position.z = 5;
+camera.position.set(cameraPositionX, cameraPositionY, cameraPositionZ);
 
 // Animation loop
 function animate() {
