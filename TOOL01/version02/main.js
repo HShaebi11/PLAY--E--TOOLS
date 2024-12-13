@@ -42,6 +42,25 @@ controls.dampingFactor = 0.05;
 // Position camera
 camera.position.z = 5;
 
+// Add input variable
+let inputValue = '';
+
+// Add input event listener
+const input01 = document.getElementById('input01');
+input01.addEventListener('input', (event) => {
+    inputValue = event.target.value;
+    
+    // Update cube properties based on input length
+    const length = inputValue.length;
+    
+    // Scale cube based on input length
+    cube.scale.set(1 + length * 0.1, 1 + length * 0.1, 1 + length * 0.1);
+    
+    // Change color based on input length
+    const hue = (length * 30) % 360;
+    cube.material.color.setHSL(hue/360, 1, 0.5);
+});
+
 // Animation loop
 function animate() {
     requestAnimationFrame(animate);
