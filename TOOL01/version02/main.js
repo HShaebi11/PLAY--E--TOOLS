@@ -132,13 +132,8 @@ function convertToRangeInput(elementId, currentValue, minValue, maxValue, stepVa
     input.min = minValue;
     input.max = maxValue;
     input.step = stepValue;
-    input.className = 'field';
-    
-    const computedStyle = window.getComputedStyle(element);
-    input.style.width = computedStyle.width;
-    input.style.margin = computedStyle.margin;
-    
     input.id = element.id;
+    
     element.parentNode.replaceChild(input, element);
 
     input.addEventListener('input', function() {
