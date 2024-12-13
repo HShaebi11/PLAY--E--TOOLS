@@ -496,71 +496,70 @@ function convertToModelInput(elementId) {
     // Import functionality
     input.addEventListener('change', function(event) {
         const file = event.target.files[0];
-        if (!file) return;
-
-        try {
-            const fileURL = URL.createObjectURL(file);
-            
-            // Load the 3D model
-            loader.load(
-                fileURL,
-                function (gltf) {
-                    // Remove existing cube and detach controls
-                    transformControls.detach();
-                    scene.remove(cube);
-
-                    // Get the model
-                    const model = gltf.scene;
-                    
-                    // Center the model
-                    const box = new THREE.Box3().setFromObject(model);
-                    const center = box.getCenter(new THREE.Vector3());
-                    const size = box.getSize(new THREE.Vector3());
-                    
-                    // Reset model position to center
-                    model.position.set(0, 0, 0);
-                    model.updateMatrixWorld();
-                    
-                    // Adjust model scale to fit in view
-                    const maxDim = Math.max(size.x, size.y, size.z);
-                    const scale = 2 / maxDim;
-                    model.scale.multiplyScalar(scale);
-                    
-                    // Replace cube reference with new model
-                    cube = model;
-                    
-                    // Add to scene and attach controls
-                    scene.add(cube);
-                    transformControls.attach(cube);
-                    
-                    // Reset camera position based on model size
-                    const distance = maxDim * 2;
-                    camera.position.set(distance, distance, distance);
-                    camera.lookAt(0, 0, 0);
-                    
-                    // Reset
-                    transformControls.position.set(0, 0, 0);
-                    transformControls.quaternion.copy(new THREE.Quaternion());
-                    transformControls.scale.set(1, 1, 1);
-                    
-                    // Cleanup
-                    URL.revokeObjectURL(fileURL);
-                    
-                    console.log('Model imported successfully');
-                },
-                function (xhr) {
-                    console.log((xhr.loaded / xhr.total * 100) + '% loaded');
-                },
-                function (error) {
-                    console.error('Error loading model:', error);
-                    alert('Error loading 3D model. Please check the file.');
-                    URL.revokeObjectURL(fileURL);
-                }
-            );
-        } catch (error) {
-            console.error('Error importing model:', error);
-            alert('Error importing 3D model. Please check the file.');
+        if (!file) {
+            console.log('No file selected');
+            return;
         }
+
+        console.log('File selected:', file.name);
+
+        const fileURL = URL.createObjectURL(file);
+        console.log('Created URL:', fileURL);
+
+        // Load the 3D model
+        loader.load(
+            fileURL,
+            function (gltf) {
+                console.log('Model loaded successfully');
+                
+                // Remove existing cube
+                scene.remove(cube);
+                transformControls.detach();
+                console.log('Removed existing cube');
+
+                // Get the model and log its contents
+                const model = gltf.scene;
+                console.log('Model contents:', model);
+
+                // Basic position and scale
+                model.position.set(0, 0, 0);
+                model.scale.set(1, 1, 1);
+                
+                // Add to scene
+                scene.add(model);
+                console.log('Added model to scene');
+
+                // Update cube reference
+                cube = model;
+
+                // Attach controls
+                transformControls.attach(cube);
+                console.log('Attached controls');
+
+                // Reset camera
+                camera.position.set(0, 0, 5);
+                camera.lookAt(0, 0, 0);
+                controls.reset();
+
+                // Force render
+                renderer.render(scene, camera);
+
+                // Cleanup
+                URL.revokeObjectURL(fileURL);
+            },
+            // Progress callback
+            function (xhr) {
+                const percent = (xhr.loaded / xhr.total * 100);
+                console.log(percent + '% loaded');
+            },
+            // Error callback
+            function (error) {
+                console.error('Error loading model:', error);
+                console.error('Error details:', error.message);
+                alert('Failed to load model. Check console for details.');
+                URL.revokeObjectURL(fileURL);
+            }
+        );
     });
 
     return input;
