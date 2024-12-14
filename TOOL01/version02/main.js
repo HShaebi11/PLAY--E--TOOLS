@@ -1126,3 +1126,60 @@ document.addEventListener('DOMContentLoaded', function() {
     // ... your existing DOMContentLoaded handlers ...
     addBackgroundUpload();
 });
+
+// Add this to your existing code
+function setupPNGExport() {
+    const pngButton = document.getElementById('pngbutton');
+    
+    if (!pngButton) {
+        console.error('PNG export button not found');
+        return;
+    }
+
+    pngButton.addEventListener('click', function() {
+        if (!object) {
+            alert('Please load a 3D model first');
+            return;
+        }
+
+        // Hide transform controls temporarily
+        const wasVisible = transformControls.visible;
+        transformControls.visible = false;
+        renderer.render(scene, camera);
+
+        try {
+            // Get the canvas
+            const canvas = renderer.domElement;
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            
+            // Create download link
+            const link = document.createElement('a');
+            link.download = `3d-model-${timestamp}.png`;
+            
+            // Convert canvas to blob
+            canvas.toBlob(function(blob) {
+                link.href = URL.createObjectURL(blob);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                // Cleanup
+                setTimeout(() => URL.revokeObjectURL(link.href), 100);
+            }, 'image/png');
+
+        } catch (error) {
+            console.error('PNG Export Error:', error);
+            alert('Failed to export PNG. Please check console for details.');
+        } finally {
+            // Restore transform controls
+            transformControls.visible = wasVisible;
+            renderer.render(scene, camera);
+        }
+    });
+}
+
+// Add this to your DOMContentLoaded event listener or initialization code
+document.addEventListener('DOMContentLoaded', function() {
+    // ... your existing initialization code ...
+    setupPNGExport();
+});
