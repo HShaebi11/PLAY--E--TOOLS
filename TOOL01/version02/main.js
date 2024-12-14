@@ -29,7 +29,7 @@ const objectProperties = {
     position: { x: 0, y: 0, z: 0 },
     rotation: { x: 0, y: 0, z: 0 },
     scale: { x: 1, y: 1, z: 1 },
-    color: 0x00ff00
+    color: 0xffffff
 };
 
 // ===== Model Setup =====
@@ -142,6 +142,9 @@ function loadModelByFormat(url, format) {
                     objectProperties.scale.z
                 );
 
+                // After loading, set the color to green
+                objectProperties.color = 0x00ff00; // Green color
+
                 // Apply materials and color
                 modelObject.traverse((child) => {
                     if (child.isMesh) {
@@ -162,7 +165,7 @@ function loadModelByFormat(url, format) {
                 transformControls.attach(object);
                 transformControls.setMode('translate');
 
-                // Initialize UI
+                // Initialize UI with the new green color
                 initializeInputs();
                 initializeScaleDisplays();
                 updateUIFromObject();
