@@ -422,7 +422,8 @@ function convertToColorInput(elementId, currentColor, updateCallback) {
         height: computedStyle.height,
         padding: computedStyle.padding,
         margin: computedStyle.margin,
-        border: computedStyle.border
+        border: computedStyle.border,
+        backgroundColor: input.value // Set initial background color
     });
     
     input.id = element.id;
@@ -430,6 +431,15 @@ function convertToColorInput(elementId, currentColor, updateCallback) {
 
     input.addEventListener('input', function() {
         const colorValue = parseInt(this.value.substring(1), 16);
+        // Update the input's background color
+        input.style.backgroundColor = this.value;
+        // Calculate brightness and set text color
+        const r = parseInt(this.value.substr(1,2), 16);
+        const g = parseInt(this.value.substr(3,2), 16);
+        const b = parseInt(this.value.substr(5,2), 16);
+        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+        input.style.color = brightness > 128 ? '#000000' : '#ffffff';
+        // Call the original update callback
         updateCallback(colorValue);
     });
 
@@ -672,6 +682,28 @@ function updateUIFromObject() {
     document.getElementById('ValueRange01').textContent = object.scale.x.toFixed(2);
     document.getElementById('ValueRange02').textContent = object.scale.y.toFixed(2);
     document.getElementById('ValueRange03').textContent = object.scale.z.toFixed(2);
+
+    // Update color input
+    const colorInput = document.getElementById('field01');
+    if (colorInput && object) {
+        // Get the current color from the object's material
+        let currentColor;
+        object.traverse((child) => {
+            if (child.isMesh && child.material) {
+                currentColor = child.material.color;
+            }
+        });
+        
+        if (currentColor) {
+            // Convert THREE.js color to hex string
+            const hexColor = '#' + currentColor.getHexString();
+            colorInput.value = hexColor;
+            colorInput.style.backgroundColor = hexColor; // Set background color
+            // Set text color to white or black depending on background brightness
+            const brightness = (currentColor.r * 299 + currentColor.g * 587 + currentColor.b * 114) / 1000;
+            colorInput.style.color = brightness > 0.5 ? '#000000' : '#ffffff';
+        }
+    }
 }
 
 // Keyboard controls for transform modes
