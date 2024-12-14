@@ -965,3 +965,35 @@ function loadOBJModel(url) {
         );
     });
 }
+
+function handleHoverDisplay(hoverElementId, displayElementId) {
+    const hoverElement = document.getElementById(hoverElementId);
+    const displayElement = document.getElementById(displayElementId);
+
+    if (!hoverElement || !displayElement) {
+        console.error('One or both elements not found');
+        return;
+    }
+
+    hoverElement.addEventListener('mouseover', () => {
+        displayElement.style.display = 'flex';
+    });
+
+    hoverElement.addEventListener('mouseout', () => {
+        displayElement.style.display = 'none';
+    });
+}
+
+//Usage example:
+handleHoverDisplay('infoButtonUpload', 'infoBoxUpload');
+handleHoverDisplay('infoButtonColour', 'infoBoxColour');
+handleHoverDisplay('infoButtonUpload', 'infoBoxUpload');
+handleHoverDisplay('infoButtonXP', 'infoBoxXP');
+handleHoverDisplay('infoButtonYP', 'infoBoxYP');
+handleHoverDisplay('infoButtonZP', 'infoBoxZP');
+handleHoverDisplay('infoButtonXR', 'infoBoxXR');
+handleHoverDisplay('infoButtonYR', 'infoBoxYR');
+handleHoverDisplay('infoButtonZR', 'infoBoxZR');
+handleHoverDisplay('infoButtonXS', 'infoBoxXS');
+handleHoverDisplay('infoButtonYS', 'infoBoxYS');
+handleHoverDisplay('infoButtonZS', 'infoBoxZS');
