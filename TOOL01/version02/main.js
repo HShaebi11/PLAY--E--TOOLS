@@ -1,3 +1,6 @@
+// Add this at the top of your file
+const OBJLoader = THREE.OBJLoader;
+
 // ===== Scene, Camera, and Renderer Setup =====
 const scene = new THREE.Scene();
 const container = document.querySelector('#three-container');
@@ -31,7 +34,6 @@ const objectProperties = {
 
 // ===== Model Setup =====
 let object; // Will store our current model
-const loader = new THREE.GLTFLoader();
 
 // ===== Camera and Controls Setup =====
 // Fixed camera position
@@ -79,154 +81,145 @@ document.addEventListener('keydown', function(event) {
 });
 
 // ===== Model Loading Function =====
-function loadModel(url) {
-    loader.load(
-        url,
-        function (gltf) {
-            if (object) {
-                transformControls.detach();
-                scene.remove(object);
-                if (object.geometry) object.geometry.dispose();
-                if (object.material) {
-                    if (Array.isArray(object.material)) {
-                        object.material.forEach(mat => mat.dispose());
-                    } else {
-                        object.material.dispose();
+function loadModelByFormat(url, format) {
+    return new Promise((resolve, reject) => {
+        const loader = loaders[format];
+        
+        if (!loader) {
+            reject(new Error(`No loader available for format: ${format}`));
+            return;
+        }
+
+        loader.load(
+            url,
+            (loadedObject) => {
+                // Handle different loader return types
+                let modelObject;
+                if (loadedObject.scene) {
+                    // GLTF/GLB returns { scene }
+                    modelObject = loadedObject.scene;
+                } else if (Array.isArray(loadedObject)) {
+                    // Some loaders return arrays
+                    modelObject = new THREE.Group().add(...loadedObject);
+                } else {
+                    // Direct object return
+                    modelObject = loadedObject;
+                }
+
+                // Clean up existing object
+                if (object) {
+                    transformControls.detach();
+                    scene.remove(object);
+                    if (object.geometry) object.geometry.dispose();
+                    if (object.material) {
+                        if (Array.isArray(object.material)) {
+                            object.material.forEach(mat => mat.dispose());
+                        } else {
+                            object.material.dispose();
+                        }
                     }
                 }
+
+                // Center the model
+                const box = new THREE.Box3().setFromObject(modelObject);
+                const center = box.getCenter(new THREE.Vector3());
+                modelObject.position.sub(center);
+
+                // Apply initial properties
+                modelObject.position.set(
+                    objectProperties.position.x,
+                    objectProperties.position.y,
+                    objectProperties.position.z
+                );
+                modelObject.rotation.set(
+                    objectProperties.rotation.x,
+                    objectProperties.rotation.y,
+                    objectProperties.rotation.z
+                );
+                modelObject.scale.set(
+                    objectProperties.scale.x,
+                    objectProperties.scale.y,
+                    objectProperties.scale.z
+                );
+
+                // Apply materials and color
+                modelObject.traverse((child) => {
+                    if (child.isMesh) {
+                        child.material = new THREE.MeshPhongMaterial({ 
+                            color: objectProperties.color 
+                        });
+                        child.material.userData = {
+                            originalColor: objectProperties.color
+                        };
+                    }
+                });
+
+                // Set as current object
+                object = modelObject;
+                scene.add(object);
+
+                // Setup controls
+                transformControls.attach(object);
+                transformControls.setMode('translate');
+
+                // Initialize UI
+                initializeInputs();
+                initializeScaleDisplays();
+                updateUIFromObject();
+
+                renderer.render(scene, camera);
+                resolve(modelObject);
+            },
+            (xhr) => {
+                console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+            },
+            (error) => {
+                console.error('Error loading model:', error);
+                reject(error);
             }
-
-            const model = gltf.scene;
-            
-            // Center the model
-            const box = new THREE.Box3().setFromObject(model);
-            const center = box.getCenter(new THREE.Vector3());
-            model.position.sub(center);
-
-            // Apply initial properties
-            model.position.set(objectProperties.position.x, objectProperties.position.y, objectProperties.position.z);
-            model.rotation.set(objectProperties.rotation.x, objectProperties.rotation.y, objectProperties.rotation.z);
-            model.scale.set(objectProperties.scale.x, objectProperties.scale.y, objectProperties.scale.z);
-
-            // Apply materials and color
-            model.traverse((child) => {
-                if (child.isMesh) {
-                    child.material = new THREE.MeshPhongMaterial({ 
-                        color: objectProperties.color 
-                    });
-                    child.material.userData = {
-                        originalColor: objectProperties.color
-                    };
-                }
-            });
-
-            // Add to scene and setup controls
-            object = model;
-            scene.add(object);
-            
-            // Attach transform controls
-            transformControls.attach(object);
-            transformControls.setMode('translate');
-
-            // Initialize UI only after object is loaded
-            initializeInputs();
-            initializeScaleDisplays();
-            updateUIFromObject();
-
-            renderer.render(scene, camera);
-        },
-        undefined,
-        function (error) {
-            console.error('Error loading model:', error);
-            alert('Failed to load model');
-        }
-    );
+        );
+    });
 }
 
 // ===== File Upload Handler =====
-// File format conversion utilities
+// Add loader definitions at the top
+const loaders = {
+    'gltf': THREE.GLTFLoader && new THREE.GLTFLoader(),
+    'glb': THREE.GLTFLoader && new THREE.GLTFLoader(),
+    'obj': THREE.OBJLoader && new THREE.OBJLoader(),
+    'fbx': THREE.FBXLoader && new THREE.FBXLoader(),
+    'stl': THREE.STLLoader && new THREE.STLLoader(),
+    'dae': THREE.ColladaLoader && new THREE.ColladaLoader(),
+    'ply': THREE.PLYLoader && new THREE.PLYLoader(),
+    '3ds': THREE.TDSLoader && new THREE.TDSLoader(),
+    'pcd': THREE.PCDLoader && new THREE.PCDLoader(),
+    'vtk': THREE.VTKLoader && new THREE.VTKLoader(),
+    'amf': THREE.AMFLoader && new THREE.AMFLoader(),
+    '3mf': THREE.ThreeMFLoader && new THREE.ThreeMFLoader(),
+    'x': THREE.XLoader && new THREE.XLoader(),
+    'json': new THREE.ObjectLoader()
+};
+
+// Add supported formats definition
 const supportedFormats = {
+    '.glb': 'model/gltf-binary',
+    '.gltf': 'model/gltf+json',
     '.obj': 'model/obj',
     '.fbx': 'model/fbx',
     '.stl': 'model/stl',
     '.dae': 'model/collada',
-    '.ply': 'model/ply',
-    '.3ds': 'model/3ds',
-    '.glb': 'model/gltf-binary',
-    '.gltf': 'model/gltf+json'
+    '.ply': 'application/x-ply',
+    '.3ds': 'application/x-3ds',
+    '.3mf': 'model/3mf',
+    '.amf': 'application/x-amf',
+    '.wrl': 'model/vrml',
+    '.vtk': 'model/vtk',
+    '.pcd': 'application/x-pcd',
+    '.x': 'application/x-directx',
+    '.json': 'application/json'
 };
 
-const OBJLoader = THREE.OBJLoader;
-const FBXLoader = THREE.FBXLoader;
-const STLLoader = THREE.STLLoader;
-
-// Updated conversion function
-async function convertToGLB(file) {
-    try {
-        const extension = file.name.toLowerCase().match(/\.[0-9a-z]+$/)[0];
-        
-        // If it's already GLB/GLTF, return as is
-        if (extension === '.glb' || extension === '.gltf') {
-            return file;
-        }
-
-        // Create object URL for the file
-        const objectURL = URL.createObjectURL(file);
-        
-        // Initialize appropriate loader based on file type
-        let loader;
-        switch (extension) {
-            case '.obj':
-                loader = new OBJLoader();
-                break;
-            case '.fbx':
-                loader = new FBXLoader();
-                break;
-            case '.stl':
-                loader = new STLLoader();
-                break;
-            default:
-                throw new Error(`Unsupported format: ${extension}`);
-        }
-
-        // Load the model
-        const model = await new Promise((resolve, reject) => {
-            loader.load(
-                objectURL,
-                (object) => resolve(object),
-                undefined,
-                (error) => reject(error)
-            );
-        });
-
-        // Clean up the object URL
-        URL.revokeObjectURL(objectURL);
-
-        // Convert to scene if not already
-        const scene = new THREE.Scene();
-        scene.add(model);
-
-        // Export to GLB
-        const exporter = new THREE.GLTFExporter();
-        const glbData = await new Promise((resolve, reject) => {
-            exporter.parse(
-                scene,
-                (result) => resolve(result),
-                (error) => reject(error),
-                { binary: true } // Export as GLB
-            );
-        });
-
-        // Create new File object with GLB data
-        return new File([glbData], 'converted.glb', { type: 'model/gltf-binary' });
-
-    } catch (error) {
-        console.error('Conversion error:', error);
-        throw error;
-    }
-}
-
-// Modified file upload handler for direct OBJ support
+// Modified file upload handler
 function addModelUpload() {
     const uploadButton = document.getElementById('upload');
     if (!uploadButton) {
@@ -238,7 +231,7 @@ function addModelUpload() {
 
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.obj,.glb,.gltf'; // Now accepting OBJ directly
+    input.accept = Object.keys(supportedFormats).join(',');
     input.style.display = 'none';
     uploadButton.appendChild(input);
 
@@ -261,14 +254,9 @@ function addModelUpload() {
         try {
             const fileURL = URL.createObjectURL(file);
             const extension = file.name.toLowerCase().match(/\.[0-9a-z]+$/)[0];
+            const format = extension.substring(1); // Remove the dot
 
-            if (extension === '.obj') {
-                // Handle OBJ files
-                await loadOBJModel(fileURL);
-            } else {
-                // Handle GLB/GLTF files
-                await loadModel(fileURL);
-            }
+            await loadModelByFormat(fileURL, format);
             URL.revokeObjectURL(fileURL);
         } catch (error) {
             console.error('Loading error:', error);
@@ -278,79 +266,6 @@ function addModelUpload() {
                 loadingDiv.parentNode.removeChild(loadingDiv);
             }
         }
-    });
-}
-
-// New function to load OBJ files
-function loadOBJModel(url) {
-    return new Promise((resolve, reject) => {
-        // Create new instance of OBJLoader
-        const loader = new OBJLoader();
-        
-        loader.load(
-            url,
-            (objModel) => {
-                if (object) {
-                    transformControls.detach();
-                    scene.remove(object);
-                    if (object.geometry) object.geometry.dispose();
-                    if (object.material) {
-                        if (Array.isArray(object.material)) {
-                            object.material.forEach(mat => mat.dispose());
-                        } else {
-                            object.material.dispose();
-                        }
-                    }
-                }
-
-                // Center the model
-                const box = new THREE.Box3().setFromObject(objModel);
-                const center = box.getCenter(new THREE.Vector3());
-                objModel.position.sub(center);
-
-                // Apply initial properties
-                objModel.position.set(objectProperties.position.x, objectProperties.position.y, objectProperties.position.z);
-                objModel.rotation.set(objectProperties.rotation.x, objectProperties.rotation.y, objectProperties.rotation.z);
-                objModel.scale.set(objectProperties.scale.x, objectProperties.scale.y, objectProperties.scale.z);
-
-                // Apply materials and color
-                objModel.traverse((child) => {
-                    if (child.isMesh) {
-                        child.material = new THREE.MeshPhongMaterial({ 
-                            color: objectProperties.color 
-                        });
-                        child.material.userData = {
-                            originalColor: objectProperties.color
-                        };
-                    }
-                });
-
-                // Add to scene and setup controls
-                object = objModel;
-                scene.add(object);
-                
-                // Attach transform controls
-                transformControls.attach(object);
-                transformControls.setMode('translate');
-
-                // Initialize UI
-                initializeInputs();
-                initializeScaleDisplays();
-                updateUIFromObject();
-
-                renderer.render(scene, camera);
-                resolve();
-            },
-            // Progress callback
-            (xhr) => {
-                console.log((xhr.loaded / xhr.total * 100) + '% loaded');
-            },
-            // Error callback
-            (error) => {
-                console.error('Error loading OBJ:', error);
-                reject(error);
-            }
-        );
     });
 }
 
@@ -940,5 +855,78 @@ function initializeScaleDisplays() {
             const axis = ['x', 'y', 'z'][parseInt(suffix) - 1];
             valueDisplay.textContent = object.scale[axis].toFixed(2);
         }
+    });
+}
+
+// Update the loadOBJModel function
+function loadOBJModel(url) {
+    return new Promise((resolve, reject) => {
+        // Create new instance of OBJLoader
+        const loader = new OBJLoader();
+        
+        loader.load(
+            url,
+            (objModel) => {
+                if (object) {
+                    transformControls.detach();
+                    scene.remove(object);
+                    if (object.geometry) object.geometry.dispose();
+                    if (object.material) {
+                        if (Array.isArray(object.material)) {
+                            object.material.forEach(mat => mat.dispose());
+                        } else {
+                            object.material.dispose();
+                        }
+                    }
+                }
+
+                // Center the model
+                const box = new THREE.Box3().setFromObject(objModel);
+                const center = box.getCenter(new THREE.Vector3());
+                objModel.position.sub(center);
+
+                // Apply initial properties
+                objModel.position.set(objectProperties.position.x, objectProperties.position.y, objectProperties.position.z);
+                objModel.rotation.set(objectProperties.rotation.x, objectProperties.rotation.y, objectProperties.rotation.z);
+                objModel.scale.set(objectProperties.scale.x, objectProperties.scale.y, objectProperties.scale.z);
+
+                // Apply materials and color
+                objModel.traverse((child) => {
+                    if (child.isMesh) {
+                        child.material = new THREE.MeshPhongMaterial({ 
+                            color: objectProperties.color 
+                        });
+                        child.material.userData = {
+                            originalColor: objectProperties.color
+                        };
+                    }
+                });
+
+                // Add to scene and setup controls
+                object = objModel;
+                scene.add(object);
+                
+                // Attach transform controls
+                transformControls.attach(object);
+                transformControls.setMode('translate');
+
+                // Initialize UI
+                initializeInputs();
+                initializeScaleDisplays();
+                updateUIFromObject();
+
+                renderer.render(scene, camera);
+                resolve();
+            },
+            // Progress callback
+            (xhr) => {
+                console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+            },
+            // Error callback
+            (error) => {
+                console.error('Error loading OBJ:', error);
+                reject(error);
+            }
+        );
     });
 }
