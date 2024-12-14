@@ -1183,3 +1183,144 @@ document.addEventListener('DOMContentLoaded', function() {
     // ... your existing initialization code ...
     setupPNGExport();
 });
+
+// Add this function to your existing code
+function setupVideoExport() {
+    const mp4Button = document.getElementById('mp4button');
+    
+    if (!mp4Button) {
+        console.error('MP4 export button not found');
+        return;
+    }
+
+    let mediaRecorder;
+    let recordedChunks = [];
+    let isRecording = false;
+
+    mp4Button.addEventListener('click', function() {
+        if (!object) {
+            alert('Please load a 3D model first');
+            return;
+        }
+
+        if (!isRecording) {
+            // Start Recording
+            startRecording();
+            mp4Button.textContent = 'Stop Recording';
+            mp4Button.style.backgroundColor = '#ff4444'; // Red color to indicate recording
+        } else {
+            // Stop Recording
+            stopRecording();
+            mp4Button.textContent = 'Record MP4';
+            mp4Button.style.backgroundColor = ''; // Reset color
+        }
+    });
+
+    function startRecording() {
+        recordedChunks = [];
+        const canvas = renderer.domElement;
+        const stream = canvas.captureStream(30); // 30 FPS
+
+        // Try to use H.264 codec if available, fallback to VP8/VP9
+        const mimeType = 'video/mp4;codecs=h264';
+        const options = {
+            mimeType: MediaRecorder.isTypeSupported(mimeType) ? mimeType : 'video/webm;codecs=vp9',
+            videoBitsPerSecond: 5000000 // 5 Mbps
+        };
+
+        mediaRecorder = new MediaRecorder(stream, options);
+
+        mediaRecorder.ondataavailable = function(event) {
+            if (event.data.size > 0) {
+                recordedChunks.push(event.data);
+            }
+        };
+
+        mediaRecorder.onstop = function() {
+            const blob = new Blob(recordedChunks, {
+                type: options.mimeType
+            });
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            document.body.appendChild(a);
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `3d-model-${timestamp}.${options.mimeType.includes('mp4') ? 'mp4' : 'webm'}`;
+            a.click();
+            
+            // Cleanup
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
+        };
+
+        mediaRecorder.start();
+        isRecording = true;
+
+        // Add recording indicator
+        const indicator = document.createElement('div');
+        indicator.id = 'recording-indicator';
+        indicator.innerHTML = `
+            <div class="recording-dot"></div>
+            <span>Recording...</span>
+        `;
+        document.body.appendChild(indicator);
+
+        // Add styles for recording indicator if they don't exist
+        if (!document.getElementById('recording-indicator-styles')) {
+            const style = document.createElement('style');
+            style.id = 'recording-indicator-styles';
+            style.textContent = `
+                #recording-indicator {
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: rgba(0, 0, 0, 0.7);
+                    color: white;
+                    padding: 10px 20px;
+                    border-radius: 5px;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    z-index: 1000;
+                    font-family: Arial, sans-serif;
+                }
+                .recording-dot {
+                    width: 12px;
+                    height: 12px;
+                    background: red;
+                    border-radius: 50%;
+                    animation: pulse 1s infinite;
+                }
+                @keyframes pulse {
+                    0% { opacity: 1; }
+                    50% { opacity: 0.5; }
+                    100% { opacity: 1; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+            isRecording = false;
+
+            // Remove recording indicator
+            const indicator = document.getElementById('recording-indicator');
+            if (indicator) {
+                indicator.remove();
+            }
+        }
+    }
+}
+
+// Add this to your DOMContentLoaded event listener or initialization code
+document.addEventListener('DOMContentLoaded', function() {
+    // ... your existing initialization code ...
+    setupVideoExport();
+});
+
