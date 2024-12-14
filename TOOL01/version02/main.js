@@ -44,13 +44,14 @@ camera.lookAt(0, 0, 0);
 // const controls = new THREE.OrbitControls(camera, renderer.domElement);
 // Instead, make the camera completely static
 
-// Transform controls setup with fixed camera
+// First, remove the existing TransformControls and create a custom one
 const transformControls = new THREE.TransformControls(camera, renderer.domElement);
 scene.add(transformControls);
 
 // Simplified animation loop without orbit controls
 function animate() {
     requestAnimationFrame(animate);
+    transformControls.update();
     renderer.render(scene, camera);
 }
 
@@ -613,6 +614,7 @@ transformControls.addEventListener('dragging-changed', event => controls.enabled
 // ===== Animation and Rendering =====
 function animate() {
     requestAnimationFrame(animate);
+    transformControls.update();
     renderer.render(scene, camera);
 }
 animate();
@@ -1049,4 +1051,78 @@ transformControls.addEventListener('objectChange', function() {
         }
         updateUIFromObject();
     }
+});
+
+// Add this function to your existing code
+function addBackgroundUpload() {
+    const uploadButton = document.getElementById('upload02');
+    if (!uploadButton) {
+        console.warn('Background upload button not found');
+        return;
+    }
+
+    uploadButton.style.cursor = 'pointer';
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*,video/*'; // Accept both images and videos
+    input.style.display = 'none';
+    uploadButton.appendChild(input);
+
+    uploadButton.addEventListener('click', () => input.click());
+
+    input.addEventListener('change', function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const backgroundContainer = document.getElementById('background-container');
+        if (!backgroundContainer) {
+            console.error('Background container not found');
+            return;
+        }
+
+        // Clear existing background content
+        backgroundContainer.innerHTML = '';
+
+        const fileURL = URL.createObjectURL(file);
+        
+        if (file.type.startsWith('image/')) {
+            // Handle image file
+            backgroundContainer.style.backgroundImage = `url(${fileURL})`;
+            backgroundContainer.style.backgroundSize = 'cover';
+            backgroundContainer.style.backgroundPosition = 'center';
+            backgroundContainer.style.backgroundRepeat = 'no-repeat';
+        } else if (file.type.startsWith('video/')) {
+            // Handle video file
+            const video = document.createElement('video');
+            video.src = fileURL;
+            video.autoplay = true;
+            video.loop = true;
+            video.muted = true;
+            video.style.position = 'absolute';
+            video.style.width = '100%';
+            video.style.height = '100%';
+            video.style.objectFit = 'cover';
+            video.style.zIndex = '-1';
+            
+            backgroundContainer.appendChild(video);
+            backgroundContainer.style.backgroundImage = 'none';
+        }
+
+        // Clean up the object URL after it's loaded
+        if (file.type.startsWith('image/')) {
+            const img = new Image();
+            img.onload = () => URL.revokeObjectURL(fileURL);
+            img.src = fileURL;
+        } else if (file.type.startsWith('video/')) {
+            const video = backgroundContainer.querySelector('video');
+            video.onloadeddata = () => URL.revokeObjectURL(fileURL);
+        }
+    });
+}
+
+// Add this to your initialization code (at the bottom of your file)
+document.addEventListener('DOMContentLoaded', function() {
+    // ... your existing DOMContentLoaded handlers ...
+    addBackgroundUpload();
 });
