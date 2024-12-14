@@ -144,6 +144,89 @@ function loadModel(url) {
 }
 
 // ===== File Upload Handler =====
+// File format conversion utilities
+const supportedFormats = {
+    '.obj': 'model/obj',
+    '.fbx': 'model/fbx',
+    '.stl': 'model/stl',
+    '.dae': 'model/collada',
+    '.ply': 'model/ply',
+    '.3ds': 'model/3ds',
+    '.glb': 'model/gltf-binary',
+    '.gltf': 'model/gltf+json'
+};
+
+const OBJLoader = THREE.OBJLoader;
+const FBXLoader = THREE.FBXLoader;
+const STLLoader = THREE.STLLoader;
+
+// Updated conversion function
+async function convertToGLB(file) {
+    try {
+        const extension = file.name.toLowerCase().match(/\.[0-9a-z]+$/)[0];
+        
+        // If it's already GLB/GLTF, return as is
+        if (extension === '.glb' || extension === '.gltf') {
+            return file;
+        }
+
+        // Create object URL for the file
+        const objectURL = URL.createObjectURL(file);
+        
+        // Initialize appropriate loader based on file type
+        let loader;
+        switch (extension) {
+            case '.obj':
+                loader = new OBJLoader();
+                break;
+            case '.fbx':
+                loader = new FBXLoader();
+                break;
+            case '.stl':
+                loader = new STLLoader();
+                break;
+            default:
+                throw new Error(`Unsupported format: ${extension}`);
+        }
+
+        // Load the model
+        const model = await new Promise((resolve, reject) => {
+            loader.load(
+                objectURL,
+                (object) => resolve(object),
+                undefined,
+                (error) => reject(error)
+            );
+        });
+
+        // Clean up the object URL
+        URL.revokeObjectURL(objectURL);
+
+        // Convert to scene if not already
+        const scene = new THREE.Scene();
+        scene.add(model);
+
+        // Export to GLB
+        const exporter = new THREE.GLTFExporter();
+        const glbData = await new Promise((resolve, reject) => {
+            exporter.parse(
+                scene,
+                (result) => resolve(result),
+                (error) => reject(error),
+                { binary: true } // Export as GLB
+            );
+        });
+
+        // Create new File object with GLB data
+        return new File([glbData], 'converted.glb', { type: 'model/gltf-binary' });
+
+    } catch (error) {
+        console.error('Conversion error:', error);
+        throw error;
+    }
+}
+
+// Modified file upload handler for direct OBJ support
 function addModelUpload() {
     const uploadButton = document.getElementById('upload');
     if (!uploadButton) {
@@ -155,7 +238,7 @@ function addModelUpload() {
 
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = Object.keys(supportedFormats).join(',');
+    input.accept = '.obj,.glb,.gltf'; // Now accepting OBJ directly
     input.style.display = 'none';
     uploadButton.appendChild(input);
 
@@ -163,36 +246,151 @@ function addModelUpload() {
 
     input.addEventListener('change', async function(event) {
         const file = event.target.files[0];
-        if (file) {
-            try {
-                // Show loading indicator
-                const loadingDiv = document.createElement('div');
-                loadingDiv.id = 'loading-indicator';
-                loadingDiv.textContent = 'Converting file...';
-                document.body.appendChild(loadingDiv);
+        if (!file) return;
 
-                // Convert file if needed
-                const processedFile = await convertToGLB(file);
-                const fileURL = URL.createObjectURL(processedFile);
-                
-                // Load the converted model
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = 'loading-indicator';
+        loadingDiv.innerHTML = `
+            <div class="loading-content">
+                <div>Loading ${file.name}</div>
+                <div class="loading-spinner"></div>
+            </div>
+        `;
+        document.body.appendChild(loadingDiv);
+
+        try {
+            const fileURL = URL.createObjectURL(file);
+            const extension = file.name.toLowerCase().match(/\.[0-9a-z]+$/)[0];
+
+            if (extension === '.obj') {
+                // Handle OBJ files
+                await loadOBJModel(fileURL);
+            } else {
+                // Handle GLB/GLTF files
                 await loadModel(fileURL);
-                
-                // Cleanup
-                URL.revokeObjectURL(fileURL);
-                document.body.removeChild(loadingDiv);
-                
-            } catch (error) {
-                console.error('File processing error:', error);
-                alert('Error processing file. Please try another format.');
-                const loadingDiv = document.getElementById('loading-indicator');
-                if (loadingDiv) {
-                    document.body.removeChild(loadingDiv);
-                }
+            }
+            URL.revokeObjectURL(fileURL);
+        } catch (error) {
+            console.error('Loading error:', error);
+            alert(`Error loading file: ${error.message}`);
+        } finally {
+            if (loadingDiv.parentNode) {
+                loadingDiv.parentNode.removeChild(loadingDiv);
             }
         }
     });
 }
+
+// New function to load OBJ files
+function loadOBJModel(url) {
+    return new Promise((resolve, reject) => {
+        // Create new instance of OBJLoader
+        const loader = new OBJLoader();
+        
+        loader.load(
+            url,
+            (objModel) => {
+                if (object) {
+                    transformControls.detach();
+                    scene.remove(object);
+                    if (object.geometry) object.geometry.dispose();
+                    if (object.material) {
+                        if (Array.isArray(object.material)) {
+                            object.material.forEach(mat => mat.dispose());
+                        } else {
+                            object.material.dispose();
+                        }
+                    }
+                }
+
+                // Center the model
+                const box = new THREE.Box3().setFromObject(objModel);
+                const center = box.getCenter(new THREE.Vector3());
+                objModel.position.sub(center);
+
+                // Apply initial properties
+                objModel.position.set(objectProperties.position.x, objectProperties.position.y, objectProperties.position.z);
+                objModel.rotation.set(objectProperties.rotation.x, objectProperties.rotation.y, objectProperties.rotation.z);
+                objModel.scale.set(objectProperties.scale.x, objectProperties.scale.y, objectProperties.scale.z);
+
+                // Apply materials and color
+                objModel.traverse((child) => {
+                    if (child.isMesh) {
+                        child.material = new THREE.MeshPhongMaterial({ 
+                            color: objectProperties.color 
+                        });
+                        child.material.userData = {
+                            originalColor: objectProperties.color
+                        };
+                    }
+                });
+
+                // Add to scene and setup controls
+                object = objModel;
+                scene.add(object);
+                
+                // Attach transform controls
+                transformControls.attach(object);
+                transformControls.setMode('translate');
+
+                // Initialize UI
+                initializeInputs();
+                initializeScaleDisplays();
+                updateUIFromObject();
+
+                renderer.render(scene, camera);
+                resolve();
+            },
+            // Progress callback
+            (xhr) => {
+                console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+            },
+            // Error callback
+            (error) => {
+                console.error('Error loading OBJ:', error);
+                reject(error);
+            }
+        );
+    });
+}
+
+// Make sure to add the loading indicator styles if not already present
+const style = document.createElement('style');
+style.textContent = `
+    #loading-indicator {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+    .loading-content {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+    }
+    .loading-spinner {
+        margin-top: 10px;
+        width: 30px;
+        height: 30px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #3498db;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 10px auto;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+`;
+document.head.appendChild(style);
 
 // Initialize upload functionality
 addModelUpload();
@@ -744,76 +942,3 @@ function initializeScaleDisplays() {
         }
     });
 }
-
-// File format conversion utilities
-const supportedFormats = {
-    '.obj': 'model/obj',
-    '.fbx': 'model/fbx',
-    '.stl': 'model/stl',
-    '.dae': 'model/collada',
-    '.ply': 'model/ply',
-    '.3ds': 'model/3ds',
-    '.glb': 'model/gltf-binary',
-    '.gltf': 'model/gltf+json'
-};
-
-async function convertToGLB(file) {
-    try {
-        const extension = file.name.toLowerCase().match(/\.[0-9a-z]+$/)[0];
-        
-        // If it's already GLB/GLTF, return as is
-        if (extension === '.glb' || extension === '.gltf') {
-            return file;
-        }
-
-        // Create a buffer from the file
-        const arrayBuffer = await file.arrayBuffer();
-
-        // Load the model based on its format
-        let loadedData;
-        switch (extension) {
-            case '.obj':
-                loadedData = await loaders.OBJLoader.parse(arrayBuffer);
-                break;
-            case '.fbx':
-                loadedData = await loaders.FBXLoader.parse(arrayBuffer);
-                break;
-            case '.stl':
-                loadedData = await loaders.STLLoader.parse(arrayBuffer);
-                break;
-            // Add more formats as needed
-            default:
-                throw new Error(`Unsupported format: ${extension}`);
-        }
-
-        // Convert to GLB
-        const glbData = await loaders.GLTFWriter.writeFile(loadedData, {
-            format: 'glb',
-            binary: true
-        });
-
-        // Create new File object with GLB data
-        return new File([glbData], 'converted.glb', { type: 'model/gltf-binary' });
-
-    } catch (error) {
-        console.error('Conversion error:', error);
-        throw error;
-    }
-}
-
-// Add some CSS for the loading indicator
-const style = document.createElement('style');
-style.textContent = `
-    #loading-indicator {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: rgba(0, 0, 0, 0.8);
-        color: white;
-        padding: 20px;
-        border-radius: 5px;
-        z-index: 1000;
-    }
-`;
-document.head.appendChild(style);
