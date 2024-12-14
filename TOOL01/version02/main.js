@@ -999,3 +999,54 @@ handleHoverDisplay('infoButtonYS', 'infoBoxYS');
 handleHoverDisplay('infoButtonZS', 'infoBoxZS');
 
 //phsee04done
+
+// Add at the top with other global variables
+let uniformScaleEnabled = false;
+
+// Change to work while holding Shift
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Shift') {
+        uniformScaleEnabled = true;
+        
+        if (object) {
+            // When enabling uniform scale, sync all axes to current X scale
+            const currentScale = object.scale.x;
+            updateUniformScale(currentScale);
+        }
+    }
+});
+
+document.addEventListener('keyup', (event) => {
+    if (event.key === 'Shift') {
+        uniformScaleEnabled = false;
+    }
+});
+
+// Add this function to handle uniform scaling
+function updateUniformScale(newScale) {
+    if (object && uniformScaleEnabled) {
+        // Apply the same scale to all axes
+        object.scale.set(newScale, newScale, newScale);
+        objectProperties.scale = { x: newScale, y: newScale, z: newScale };
+        
+        // Update all range inputs and displays
+        ['01', '02', '03'].forEach(suffix => {
+            const range = document.getElementById(`range${suffix}`);
+            const display = document.getElementById(`ValueRange${suffix}`);
+            if (range) range.value = newScale;
+            if (display) display.textContent = newScale.toFixed(2);
+        });
+    }
+}
+
+// Add this to your transform controls event listener
+transformControls.addEventListener('objectChange', function() {
+    if (object) {
+        if (uniformScaleEnabled && transformControls.getMode() === 'scale') {
+            // Use whichever axis changed as the uniform scale value
+            const newScale = Math.max(object.scale.x, object.scale.y, object.scale.z);
+            object.scale.set(newScale, newScale, newScale);
+        }
+        updateUIFromObject();
+    }
+});
