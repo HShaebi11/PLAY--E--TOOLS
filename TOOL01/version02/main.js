@@ -155,18 +155,41 @@ function addModelUpload() {
 
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.glb,.gltf';
+    input.accept = Object.keys(supportedFormats).join(',');
     input.style.display = 'none';
     uploadButton.appendChild(input);
 
     uploadButton.addEventListener('click', () => input.click());
 
-    input.addEventListener('change', function(event) {
+    input.addEventListener('change', async function(event) {
         const file = event.target.files[0];
         if (file) {
-            const fileURL = URL.createObjectURL(file);
-            loadModel(fileURL);
-            URL.revokeObjectURL(fileURL); // Clean up the URL
+            try {
+                // Show loading indicator
+                const loadingDiv = document.createElement('div');
+                loadingDiv.id = 'loading-indicator';
+                loadingDiv.textContent = 'Converting file...';
+                document.body.appendChild(loadingDiv);
+
+                // Convert file if needed
+                const processedFile = await convertToGLB(file);
+                const fileURL = URL.createObjectURL(processedFile);
+                
+                // Load the converted model
+                await loadModel(fileURL);
+                
+                // Cleanup
+                URL.revokeObjectURL(fileURL);
+                document.body.removeChild(loadingDiv);
+                
+            } catch (error) {
+                console.error('File processing error:', error);
+                alert('Error processing file. Please try another format.');
+                const loadingDiv = document.getElementById('loading-indicator');
+                if (loadingDiv) {
+                    document.body.removeChild(loadingDiv);
+                }
+            }
         }
     });
 }
@@ -721,3 +744,76 @@ function initializeScaleDisplays() {
         }
     });
 }
+
+// File format conversion utilities
+const supportedFormats = {
+    '.obj': 'model/obj',
+    '.fbx': 'model/fbx',
+    '.stl': 'model/stl',
+    '.dae': 'model/collada',
+    '.ply': 'model/ply',
+    '.3ds': 'model/3ds',
+    '.glb': 'model/gltf-binary',
+    '.gltf': 'model/gltf+json'
+};
+
+async function convertToGLB(file) {
+    try {
+        const extension = file.name.toLowerCase().match(/\.[0-9a-z]+$/)[0];
+        
+        // If it's already GLB/GLTF, return as is
+        if (extension === '.glb' || extension === '.gltf') {
+            return file;
+        }
+
+        // Create a buffer from the file
+        const arrayBuffer = await file.arrayBuffer();
+
+        // Load the model based on its format
+        let loadedData;
+        switch (extension) {
+            case '.obj':
+                loadedData = await loaders.OBJLoader.parse(arrayBuffer);
+                break;
+            case '.fbx':
+                loadedData = await loaders.FBXLoader.parse(arrayBuffer);
+                break;
+            case '.stl':
+                loadedData = await loaders.STLLoader.parse(arrayBuffer);
+                break;
+            // Add more formats as needed
+            default:
+                throw new Error(`Unsupported format: ${extension}`);
+        }
+
+        // Convert to GLB
+        const glbData = await loaders.GLTFWriter.writeFile(loadedData, {
+            format: 'glb',
+            binary: true
+        });
+
+        // Create new File object with GLB data
+        return new File([glbData], 'converted.glb', { type: 'model/gltf-binary' });
+
+    } catch (error) {
+        console.error('Conversion error:', error);
+        throw error;
+    }
+}
+
+// Add some CSS for the loading indicator
+const style = document.createElement('style');
+style.textContent = `
+    #loading-indicator {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 20px;
+        border-radius: 5px;
+        z-index: 1000;
+    }
+`;
+document.head.appendChild(style);
