@@ -650,6 +650,9 @@ function cleanup() {
     document.removeEventListener('keydown', handleKeyDown);
     controls.dispose();
     transformControls.dispose();
+    if (currentARSession) {
+        currentARSession.end();
+    }
 }
 
 // Transform Controls Event Listeners
@@ -1184,207 +1187,144 @@ document.addEventListener('DOMContentLoaded', function() {
     setupPNGExport();
 });
 
-// Add this function to your existing code
-function setupVideoExport() {
-    // First, load the required ffmpeg.js library
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js';
-    document.head.appendChild(script);
+// Add this near the top of your file with other global variables
+let currentARSession = null;
 
-    script.onload = () => {
-        // Wait for FFmpeg to load
-        const { createFFmpeg, fetchFile } = FFmpeg;
-        const ffmpeg = createFFmpeg({ log: true });
-
-        let mediaRecorder;
-        let recordedChunks = [];
-        let isRecording = false;
-
-        function getSupportedMimeType() {
-            const types = [
-                'video/webm;codecs=vp9',
-                'video/webm;codecs=vp8',
-                'video/webm',
-                'video/mp4;codecs=h264',
-                'video/mp4'
-            ];
-            
-            for (const type of types) {
-                if (MediaRecorder.isTypeSupported(type)) {
-                    return type;
+// Add this function to check AR support and setup the AR button
+function setupARButton() {
+    const arButton = document.getElementById('arbutton');
+    
+    if (!arButton) {
+        console.warn('AR button not found');
+        return;
+    }
+    
+    // Check if WebXR is supported with AR
+    if ('xr' in navigator) {
+        navigator.xr.isSessionSupported('immersive-ar')
+            .then((supported) => {
+                if (supported) {
+                    arButton.style.display = 'block';
+                    arButton.addEventListener('click', startARSession);
+                } else {
+                    arButton.style.display = 'none';
                 }
-            }
-            return 'video/webm'; // Fallback
-        }
-
-        const mp4Button = document.getElementById('mp4button');
-        
-        if (!mp4Button) {
-            console.error('MP4 export button not found');
-            return;
-        }
-
-        mp4Button.addEventListener('click', function() {
-            if (!object) {
-                alert('Please load a 3D model first');
-                return;
-            }
-
-            if (!isRecording) {
-                startRecording();
-                mp4Button.textContent = 'Stop Recording';
-                mp4Button.style.backgroundColor = '#ff4444';
-            } else {
-                stopRecording();
-                mp4Button.textContent = 'Record Video';
-                mp4Button.style.backgroundColor = '';
-            }
-        });
-
-        function startRecording() {
-            recordedChunks = [];
-            const canvas = renderer.domElement;
-            const stream = canvas.captureStream(30); // 30 FPS
-
-            const mimeType = getSupportedMimeType();
-            const options = {
-                mimeType: mimeType,
-                videoBitsPerSecond: 2500000 // 2.5 Mbps for better compatibility
-            };
-
-            try {
-                mediaRecorder = new MediaRecorder(stream, options);
-            } catch (e) {
-                console.error('Failed to create MediaRecorder:', e);
-                alert('Failed to start recording. Please try a different browser.');
-                return;
-            }
-
-            mediaRecorder.ondataavailable = function(event) {
-                if (event.data && event.data.size > 0) {
-                    recordedChunks.push(event.data);
-                }
-            };
-
-            mediaRecorder.onstop = async function() {
-                // Show loading indicator
-                const loadingDiv = document.createElement('div');
-                loadingDiv.id = 'conversion-indicator';
-                loadingDiv.innerHTML = `
-                    <div class="loading-content">
-                        <div>Converting to MP4...</div>
-                        <div class="loading-spinner"></div>
-                    </div>
-                `;
-                document.body.appendChild(loadingDiv);
-
-                try {
-                    // Load FFmpeg
-                    await ffmpeg.load();
-
-                    // Create blob from recorded chunks
-                    const webmBlob = new Blob(recordedChunks, { type: 'video/webm' });
-                    const webmBuffer = await webmBlob.arrayBuffer();
-
-                    // Write the WebM file to FFmpeg's virtual filesystem
-                    ffmpeg.FS('writeFile', 'input.webm', new Uint8Array(webmBuffer));
-
-                    // Convert WebM to MP4
-                    await ffmpeg.run('-i', 'input.webm', '-c:v', 'libx264', '-preset', 'fast', '-c:a', 'aac', 'output.mp4');
-
-                    // Read the resulting MP4 file
-                    const mp4Data = ffmpeg.FS('readFile', 'output.mp4');
-                    const mp4Blob = new Blob([mp4Data.buffer], { type: 'video/mp4' });
-
-                    // Create download link
-                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                    const url = URL.createObjectURL(mp4Blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `3d-model-${timestamp}.mp4`;
-                    document.body.appendChild(a);
-                    a.click();
-
-                    // Cleanup
-                    setTimeout(() => {
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
-                        ffmpeg.FS('unlink', 'input.webm');
-                        ffmpeg.FS('unlink', 'output.mp4');
-                    }, 100);
-
-                } catch (error) {
-                    console.error('Conversion error:', error);
-                    alert('Error converting to MP4. Please check console for details.');
-                } finally {
-                    // Remove loading indicator
-                    if (loadingDiv.parentNode) {
-                        loadingDiv.parentNode.removeChild(loadingDiv);
-                    }
-                }
-            };
-        };
-
-        function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                mediaRecorder.stop();
-                isRecording = false;
-
-                const indicator = document.getElementById('recording-indicator');
-                if (indicator) {
-                    indicator.remove();
-                }
-            }
-        }
-    };
-
-    script.onerror = () => {
-        console.error('Failed to load FFmpeg library');
-        alert('Failed to load video conversion library. MP4 conversion may not be available.');
-    };
-
-    // Add conversion indicator styles
-    const style = document.createElement('style');
-    style.textContent = `
-        #conversion-indicator {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-        .loading-content {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            text-align: center;
-        }
-        .loading-spinner {
-            margin-top: 10px;
-            width: 30px;
-            height: 30px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #3498db;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 10px auto;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    `;
-    document.head.appendChild(style);
+            })
+            .catch(error => {
+                console.error('Error checking AR support:', error);
+                arButton.style.display = 'none';
+            });
+    } else {
+        arButton.style.display = 'none';
+    }
 }
 
-// Add this to your DOMContentLoaded event listener or initialization code
+// Function to start AR session
+async function startARSession() {
+    if (!object) {
+        alert('Please load a 3D model first');
+        return;
+    }
+
+    try {
+        // Request an AR session
+        const session = await navigator.xr.requestSession('immersive-ar', {
+            requiredFeatures: ['hit-test'],
+            optionalFeatures: ['dom-overlay'],
+            domOverlay: { root: document.body }
+        });
+
+        currentARSession = session;
+
+        // Set up WebGL for AR
+        const gl = renderer.getContext();
+        const referenceSpace = await session.requestReferenceSpace('local');
+        const viewerSpace = await session.requestReferenceSpace('viewer');
+
+        // Create XR WebGL layer
+        const xrGLLayer = new XRWebGLLayer(session, gl);
+        session.updateRenderState({ baseLayer: xrGLLayer });
+
+        // Handle AR session frame updates
+        session.requestAnimationFrame(onXRFrame);
+
+        // Setup session end handling
+        session.addEventListener('end', () => {
+            currentARSession = null;
+            // Reset to normal view
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            animate();
+        });
+
+        // Clone the object for AR
+        const arObject = object.clone();
+        arObject.scale.set(0.1, 0.1, 0.1); // Scale down for AR
+        scene.add(arObject);
+
+        // Function to handle AR frames
+        function onXRFrame(time, frame) {
+            if (!currentARSession) return;
+
+            const session = frame.session;
+            session.requestAnimationFrame(onXRFrame);
+
+            // Get viewer pose
+            const pose = frame.getViewerPose(referenceSpace);
+            if (!pose) return;
+
+            // Update camera and render for AR
+            const view = pose.views[0];
+            const viewport = xrGLLayer.getViewport(view);
+            renderer.setSize(viewport.width, viewport.height);
+            
+            camera.matrix.fromArray(view.transform.matrix);
+            camera.projectionMatrix.fromArray(view.projectionMatrix);
+            camera.updateMatrixWorld(true);
+
+            // Perform hit testing
+            const hitTestResults = frame.getHitTestResults(session.requestHitTestSource({
+                space: viewerSpace
+            }));
+
+            if (hitTestResults.length > 0) {
+                const hitPose = hitTestResults[0].getPose(referenceSpace);
+                arObject.position.set(
+                    hitPose.transform.position.x,
+                    hitPose.transform.position.y,
+                    hitPose.transform.position.z
+                );
+            }
+
+            renderer.render(scene, camera);
+        }
+
+    } catch (error) {
+        console.error('Error starting AR session:', error);
+        alert('Failed to start AR session. Make sure you\'re using a compatible device and browser.');
+    }
+}
+
+// Add this to your cleanup function
+function cleanup() {
+    // ... existing cleanup code ...
+    if (currentARSession) {
+        currentARSession.end();
+    }
+}
+
+// Add AR button setup to your initialization
 document.addEventListener('DOMContentLoaded', function() {
-    // ... your existing initialization code ...
-    setupVideoExport();
+    // ... existing initialization code ...
+    setupARButton();
+});
+
+// Add error handling for unsupported devices
+window.addEventListener('error', function(event) {
+    if (event.error.toString().includes('WebXR')) {
+        const arButton = document.getElementById('arbutton');
+        if (arButton) {
+            arButton.style.display = 'none';
+        }
+    }
 });
 
