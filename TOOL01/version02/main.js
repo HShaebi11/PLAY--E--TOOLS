@@ -1328,3 +1328,109 @@ window.addEventListener('error', function(event) {
     }
 });
 
+// Add this near the top of your file after other imports
+// Add QR Code library
+const qrcodeScript = document.createElement('script');
+qrcodeScript.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js';
+document.head.appendChild(qrcodeScript);
+
+// Add this function to generate QR code modal
+function createQRCodeModal() {
+    const modalHTML = `
+        <div id="qr-modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; 
+            background-color: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center;">
+            <div style="background-color: white; padding: 20px; border-radius: 10px; max-width: 90%; max-height: 90%; text-align: center;">
+                <h3>Scan to view on mobile</h3>
+                <div id="qrcode"></div>
+                <p style="margin-top: 10px;">Or copy this link:</p>
+                <input id="share-link" type="text" readonly style="width: 100%; margin: 10px 0; padding: 5px;">
+                <button onclick="document.getElementById('qr-modal').style.display='none'" 
+                    style="margin-top: 10px; padding: 8px 16px; background-color: #4CAF50; color: white; border: none; 
+                    border-radius: 4px; cursor: pointer;">Close</button>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+// Add this function to generate and show QR code
+function showQRCode() {
+    if (!object) {
+        alert('Please load a 3D model first');
+        return;
+    }
+
+    // Create a temporary unique ID for this session
+    const sessionId = Math.random().toString(36).substring(2, 15);
+    
+    // Create the sharing URL
+    const currentURL = window.location.href.split('?')[0];
+    const shareURL = `${currentURL}?session=${sessionId}`;
+
+    // Show modal
+    const modal = document.getElementById('qr-modal');
+    if (!modal) {
+        createQRCodeModal();
+    }
+    document.getElementById('qr-modal').style.display = 'flex';
+
+    // Generate QR code
+    const qrcodeContainer = document.getElementById('qrcode');
+    qrcodeContainer.innerHTML = '';
+    QRCode.toCanvas(qrcodeContainer, shareURL, { width: 256 }, function (error) {
+        if (error) console.error(error);
+    });
+
+    // Update share link input
+    const shareLinkInput = document.getElementById('share-link');
+    shareLinkInput.value = shareURL;
+    shareLinkInput.onclick = function() {
+        this.select();
+        document.execCommand('copy');
+    };
+}
+
+// Add this function to create the QR code button
+function addQRCodeButton() {
+    const buttonContainer = document.querySelector('.button-container') || document.body;
+    const qrButton = document.createElement('button');
+    qrButton.id = 'qrbutton';
+    qrButton.innerHTML = 'View on Mobile (QR)';
+    qrButton.className = 'control-button';
+    qrButton.style.cssText = `
+        padding: 8px 16px;
+        margin: 5px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    `;
+    qrButton.onclick = showQRCode;
+    buttonContainer.appendChild(qrButton);
+}
+
+// Add to your initialization code
+document.addEventListener('DOMContentLoaded', function() {
+    // ... existing initialization code ...
+    addQRCodeButton();
+    createQRCodeModal();
+});
+
+// Add URL parameter handling for shared sessions
+function handleSharedSession() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session');
+    
+    if (sessionId) {
+        // This is a shared session
+        // You might want to adjust the UI for mobile viewing
+        // For example, hide certain controls or adjust the layout
+        document.getElementById('qrbutton')?.style.display = 'none';
+        // Add any mobile-specific adjustments here
+    }
+}
+
+// Add this to your initialization
+window.addEventListener('load', handleSharedSession);
+
